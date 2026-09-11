@@ -5,79 +5,81 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Rate Limiting</title>
 <meta name="description" content="A systems lecture on the five rate-limiting algorithms, where they live in an architecture, and why backoff needs jitter." />
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='11' fill='%2312162a'/%3E%3Cpath d='M12 6v6l4 2' stroke='%23f5a623' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='11' fill='%230a0b0d'/%3E%3Cpath d='M12 6v6l4 2' stroke='%230052ff' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Archivo+Black&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 <style>
-/* Rate Limiting — a flow-control instrument panel, not a slideshow.
+/* Rate Limiting — institutional calm, not a neon dashboard.
+   One accent (blue) reserved for action; semantic green/red stay text-only, never a button fill.
    Tokens declared once on :root, redefined for dark under both the media query and the
    explicit toggle, per the three-theme-state rule. */
 :root {
-  --paper: #f3f4f8;
-  --ink: #12162a;
-  --body: #3b415a;
-  --muted: #6c7290;
-  --muted-soft: #9498b3;
-  --hairline: #dbdeea;
-  --hairline-soft: #e8eaf3;
+  --paper: #f7f7f7;
+  --ink: #0a0b0d;
+  --body: #5b616e;
+  --muted: #7c828a;
+  --muted-soft: #a8acb3;
+  --hairline: #dee1e6;
+  --hairline-soft: #eef0f3;
   --surface: #ffffff;
-  --surface-alt: #eaecf4;
-  --accent: #f5a623;
-  --accent-strong: #d98300;
-  --accent-wash: #fdf1dc;
-  --reject: #e1495b;
-  --reject-wash: #fbe7ea;
-  --allow: #1e9e73;
-  --shadow: 0 1px 1px rgba(18, 22, 42, 0.03), 0 8px 20px -8px rgba(18, 22, 42, 0.14);
+  --surface-alt: #eef0f3;
+  --accent: #0052ff;
+  --accent-strong: #003ecc;
+  --accent-wash: #e8f0ff;
+  --reject: #cf202f;
+  --reject-wash: #fbe9ea;
+  --allow: #05b169;
+  --shadow: 0 4px 12px rgba(10, 11, 13, 0.06);
   --r-sm: 8px;
-  --r-md: 14px;
-  --r-lg: 22px;
-  --sans: 'IBM Plex Sans', -apple-system, system-ui, 'Segoe UI', sans-serif;
-  --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  --head: 'Archivo', var(--sans);
-  --numeral: 'Archivo Black', var(--head);
+  --r-md: 12px;
+  --r-xl: 24px;
+  --r-pill: 100px;
+  --sans: 'Inter', -apple-system, system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --head: 'Inter', var(--sans);
+  --numeral: 'Inter', var(--head);
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --paper: #0e1120;
-    --ink: #eef0fb;
-    --body: #c2c6dc;
-    --muted: #868cae;
-    --muted-soft: #656b8c;
-    --hairline: #2a2f4a;
-    --hairline-soft: #1e2238;
-    --surface: #161a30;
-    --surface-alt: #1c2038;
-    --accent: #ffb84d;
-    --accent-strong: #ffcc80;
-    --accent-wash: #3a2c12;
-    --reject: #ff7a8a;
-    --reject-wash: #3a1620;
-    --allow: #4fd6a5;
-    --shadow: 0 1px 1px rgba(0, 0, 0, 0.3), 0 10px 26px -10px rgba(0, 0, 0, 0.6);
+    --paper: #0a0b0d;
+    --ink: #ffffff;
+    --body: #c4c9d1;
+    --muted: #a8acb3;
+    --muted-soft: #6b7078;
+    --hairline: #2a2d33;
+    --hairline-soft: #1f2226;
+    --surface: #16181c;
+    --surface-alt: #1f2226;
+    --accent: #4d84ff;
+    --accent-strong: #82a9ff;
+    --accent-wash: #14203f;
+    --reject: #ff6b6b;
+    --reject-wash: #3a1a1c;
+    --allow: #2fd98a;
+    --shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
     color-scheme: dark;
   }
 }
 :root[data-theme='dark'] {
-  --paper: #0e1120;
-  --ink: #eef0fb;
-  --body: #c2c6dc;
-  --muted: #868cae;
-  --muted-soft: #656b8c;
-  --hairline: #2a2f4a;
-  --hairline-soft: #1e2238;
-  --surface: #161a30;
-  --surface-alt: #1c2038;
-  --accent: #ffb84d;
-  --accent-strong: #ffcc80;
-  --accent-wash: #3a2c12;
-  --reject: #ff7a8a;
-  --reject-wash: #3a1620;
-  --allow: #4fd6a5;
-  --shadow: 0 1px 1px rgba(0, 0, 0, 0.3), 0 10px 26px -10px rgba(0, 0, 0, 0.6);
+  --paper: #0a0b0d;
+  --ink: #ffffff;
+  --body: #c4c9d1;
+  --muted: #a8acb3;
+  --muted-soft: #6b7078;
+  --hairline: #2a2d33;
+  --hairline-soft: #1f2226;
+  --surface: #16181c;
+  --surface-alt: #1f2226;
+  --accent: #4d84ff;
+  --accent-strong: #82a9ff;
+  --accent-wash: #14203f;
+  --reject: #ff6b6b;
+  --reject-wash: #3a1a1c;
+  --allow: #2fd98a;
+  --shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
   color-scheme: dark;
 }
 
@@ -111,7 +113,7 @@ body {
   gap: 26px;
   padding: 54px 80px 36px;
   background: var(--surface);
-  border-radius: var(--r-lg);
+  border-radius: var(--r-xl);
   box-shadow: var(--shadow);
   overflow: hidden;
 }
@@ -126,7 +128,7 @@ body {
 }
 .eyebrow .ic { width: 20px; height: 20px; color: var(--accent-strong); flex: none; }
 h1, h2 { margin: 0; color: var(--ink); text-wrap: balance; font-family: var(--head); }
-h2 { font-size: 38px; font-weight: 700; letter-spacing: -0.4px; line-height: 1.16; max-width: 27ch; }
+h2 { font-size: 38px; font-weight: 400; letter-spacing: -0.6px; line-height: 1.16; max-width: 27ch; }
 .display { font-family: var(--numeral); font-size: 68px; font-weight: 400; letter-spacing: -1px; line-height: 1.04; }
 .lead { margin: 0; font-size: 21px; line-height: 1.55; color: var(--body); max-width: 42ch; }
 .mono { font-family: var(--mono); }
@@ -139,7 +141,7 @@ code { font-family: var(--mono); font-size: 0.86em; background: var(--surface-al
 .chip {
   display: inline-flex; align-items: center; gap: 6px;
   font-family: var(--mono); font-size: 12.5px; font-weight: 500; line-height: 1;
-  padding: 7px 11px; border-radius: 7px;
+  padding: 7px 12px; border-radius: var(--r-pill);
   border: 1px solid var(--hairline); background: var(--surface-alt); color: var(--body);
   white-space: nowrap;
 }
@@ -159,12 +161,12 @@ code { font-family: var(--mono); font-size: 0.86em; background: var(--surface-al
 
 .card {
   display: flex; flex-direction: column; gap: 12px;
-  padding: 22px; border: 1px solid var(--hairline); border-radius: var(--r-md); background: var(--surface);
+  padding: 22px; border: 1px solid var(--hairline); border-radius: var(--r-xl); background: var(--surface);
 }
 .card.lift { box-shadow: var(--shadow); border-color: transparent; background: var(--surface); }
 .card .ic { width: 26px; height: 26px; color: var(--accent-strong); }
 .card .k { font-family: var(--mono); font-size: 13px; font-weight: 500; color: var(--muted); }
-.card .t { font-size: 24px; font-weight: 700; letter-spacing: -0.2px; line-height: 1.2; font-family: var(--head); }
+.card .t { font-size: 24px; font-weight: 400; letter-spacing: -0.3px; line-height: 1.2; font-family: var(--head); }
 .card p { margin: 0; font-size: 16.5px; line-height: 1.5; color: var(--body); }
 .card .code { margin-top: auto; font-size: 13.5px; padding: 12px 14px; }
 
@@ -263,7 +265,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent-stro
 .cover-grid .lead { margin-top: 26px; }
 .gauge-card {
   display: flex; flex-direction: column; align-items: center; gap: 10px;
-  padding: 26px 24px 20px; border-radius: var(--r-lg); box-shadow: var(--shadow); background: var(--surface);
+  padding: 26px 24px 20px; border-radius: var(--r-xl); border: 1px solid var(--hairline); background: var(--surface);
 }
 .gauge-card figcaption { text-align: center; font-size: 13.5px; }
 
@@ -365,7 +367,7 @@ body.overview .progress, body.overview .pager { display: none; }
             <circle cx="110" cy="120" r="7" class="sv-ink"/>
             <text x="110" y="145" text-anchor="middle" class="sv-lbl-sm">throttled</text>
           </svg>
-          <figcaption>The needle sits in the amber band the moment a caller is asked to slow down.</figcaption>
+          <figcaption>The needle sits in the blue band the moment a caller is asked to slow down.</figcaption>
         </figure>
       </div>
       <div class="notes"><p>Open with the two places a limiter matters: protecting your own system from callers, and behaving as a well-mannered client of someone else's API. Everything in this deck maps to one of those two roles.</p></div>

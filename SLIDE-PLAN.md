@@ -2,27 +2,35 @@
 
 Generic systems lecture, not tied to any employer's codebase — pseudocode and public,
 well-documented patterns only (AWS's backoff-and-jitter writeup, Redis command semantics,
-the standard bucket/window taxonomy). Deployable as a static site on GitHub Pages: no build
-step, no server, three files (`index.html`, `deck.css`, `deck.js`, `widgets.js`) loaded relative
-to each other.
+the standard bucket/window taxonomy). Deployable as a static site on GitHub Pages: a single
+self-contained `index.html` (styles and scripts inlined, no separate files to go missing),
+plus a GitHub Actions workflow that publishes it on every push.
 
 ## Visual concept
 
-Rate limiting is a **flow-control** problem — valves, gauges, meters — so the deck borrows that
-vocabulary instead of a generic "tech talk" look. A single amber signal color (`#F5A623`-family)
-stands for "throttle," used the way a flow gauge uses its needle: sparingly, only where something
-is actually being metered. Danger red is reserved for "rejected" (429), a separate hue from the
-brand accent so the two never compete. A thin hand-drawn icon sprite (bucket, pipe, window, ledger,
-gauge, clock, die) marks each section, in the single-stroke style of a schematic legend.
+Institutional calm, modeled after Coinbase's public design system: one restrained accent color
+carries every action, display type stays at a light weight instead of shouting, and depth comes
+from a hairline border on ~95% of surfaces rather than a stack of shadows. Semantic green/red
+exist only as text — for the allow/reject verdicts a rate limiter actually produces — and never
+as a button fill, so they read as information, not decoration. A thin hand-drawn icon sprite
+(bucket, pipe, window, ledger, gauge, clock, die) still marks each section, in the single-stroke
+style of a schematic legend, but the palette around it is quiet enough that the icon does the
+signaling, not a glowing accent.
 
-- **Color**: paper `#F3F4F8` (cool, not cream) · ink `#12162A` · body `#3B415A` · muted `#6C7290` ·
-  hairline `#DBDEEA` · accent (throttle) `#F5A623` · accent-strong `#D98300` · reject `#E1495B` ·
-  allow `#1E9E73`. Dark mode swaps to ink-navy ground `#0E1120` with the same accent, contrast kept
-  legible both ways; toggled with `t`, otherwise follows system.
-- **Type**: **Archivo** (700/800) for headings — a grotesk with enough weight to read as signage;
-  **Archivo Black** only for the one big hero numeral per slide; **IBM Plex Sans** for body copy;
-  **IBM Plex Mono** for pseudocode, data, and the little schematic labels. Plex Sans/Mono are drawn
-  from the same family, so code and prose sit together without clashing.
+- **Color**: paper `#F7F7F7` (a soft neutral floor, not the card itself) · surface `#FFFFFF` ·
+  ink `#0A0B0D` · body `#5B616E` · muted `#7C828A` · hairline `#DEE1E6` · accent `#0052FF` ·
+  accent-strong (press) `#003ECC` · reject (text-only) `#CF202F` · allow (text-only) `#05B169`.
+  One shadow tier (`0 4px 12px rgba(10,11,13,.06)`), used only where something genuinely floats —
+  the slide itself over its backdrop, the notes overlay — never stacked on cards sitting inside
+  those. Dark mode swaps to a near-black ground `#0A0B0D` with a lighter accent for contrast;
+  toggled with `t`, otherwise follows system.
+- **Type**: **Inter** for both headings and body — Coinbase's own stated fallback for its custom
+  cuts — differentiated by weight and size rather than by swapping families. Headings and the one
+  big numeral per slide stay at **weight 400** even at 68px: restraint over shouting is the whole
+  point of the reference. **JetBrains Mono** carries pseudocode, data, and schematic labels.
+- **Shape**: chips and segmented-control buttons are full pills (`100px` radius, matching Coinbase's
+  CTA and badge shapes); cards and the slide frame itself use a calmer `24px` radius; inputs and
+  code blocks stay at `12px`.
 - **Layout**: same reusable layouts as before (split 60/40, trio, table, full), but every diagram
   now sits inside a "meter" — a hairline-bordered field with axis ticks — rather than floating on
   white, so the deck reads as one instrument panel rather than a slideshow.
@@ -31,7 +39,7 @@ gauge, clock, die) marks each section, in the single-stroke style of a schematic
 
 | # | Title | Layout | Visual | Steps |
 |---|---|---|---|---|
-| 1 | Rate Limiting | cover | Gauge dial hero, needle in the amber zone | — |
+| 1 | Rate Limiting | cover | Gauge dial hero, needle in the accent-blue zone | — |
 | 2 | Two places a limiter can live | full | Client → gateway → service, service → third party | 1: "gateway: often absent" |
 | 3 | Token bucket: burst, then a steady drip | split | Gantt of 10 concurrent callers against a 5-token bucket | 1: callers 6–10 |
 | 4 | Borrow first, then sleep off the debt | split | Pseudocode `acquire()` | 1–3 |
