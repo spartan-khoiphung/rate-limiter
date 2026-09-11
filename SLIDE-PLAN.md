@@ -1,43 +1,63 @@
-# SLIDE-PLAN — Rate limiter ở LoanBud
+# SLIDE-PLAN — Rate Limiting
 
-Quy trình theo repo `slides-vibe-coding-sops`: viết plan trước, rồi mới viết `index.html`.
-Phong cách theo `~/Downloads/DESIGN.md`: nền trắng, chữ ink `#222`, một màu nhấn Rausch `#ff385c`,
-bo góc 14–20px, một tầng shadow, Inter (bản thay thế Cereal mà DESIGN.md chỉ định), IBM Plex Mono cho code.
-Chỉ có giao diện sáng, vì DESIGN.md ghi rõ không có dark mode.
+Generic systems lecture, not tied to any employer's codebase — pseudocode and public,
+well-documented patterns only (AWS's backoff-and-jitter writeup, Redis command semantics,
+the standard bucket/window taxonomy). Deployable as a static site on GitHub Pages: no build
+step, no server, three files (`index.html`, `deck.css`, `deck.js`, `widgets.js`) loaded relative
+to each other.
 
-## Bố cục dùng lại
+## Visual concept
 
-- **cover**: tiêu đề trái, "thẻ HTTP 429" phải.
-- **split**: hình trái (≈60%), chữ phải (≈40%). Hình là SVG vẽ theo đúng thang đo.
-- **trio**: ba thẻ ngang hàng, chỉ dùng khi có đúng ba thứ để so sánh.
-- **table**: bảng đối chiếu, số căn cột bằng `tabular-nums`.
+Rate limiting is a **flow-control** problem — valves, gauges, meters — so the deck borrows that
+vocabulary instead of a generic "tech talk" look. A single amber signal color (`#F5A623`-family)
+stands for "throttle," used the way a flow gauge uses its needle: sparingly, only where something
+is actually being metered. Danger red is reserved for "rejected" (429), a separate hue from the
+brand accent so the two never compete. A thin hand-drawn icon sprite (bucket, pipe, window, ledger,
+gauge, clock, die) marks each section, in the single-stroke style of a schematic legend.
 
-Mỗi slide: một tiêu đề, tối đa ~40 từ nội dung, chân slide ghi đường dẫn file nguồn.
+- **Color**: paper `#F3F4F8` (cool, not cream) · ink `#12162A` · body `#3B415A` · muted `#6C7290` ·
+  hairline `#DBDEEA` · accent (throttle) `#F5A623` · accent-strong `#D98300` · reject `#E1495B` ·
+  allow `#1E9E73`. Dark mode swaps to ink-navy ground `#0E1120` with the same accent, contrast kept
+  legible both ways; toggled with `t`, otherwise follows system.
+- **Type**: **Archivo** (700/800) for headings — a grotesk with enough weight to read as signage;
+  **Archivo Black** only for the one big hero numeral per slide; **IBM Plex Sans** for body copy;
+  **IBM Plex Mono** for pseudocode, data, and the little schematic labels. Plex Sans/Mono are drawn
+  from the same family, so code and prose sit together without clashing.
+- **Layout**: same reusable layouts as before (split 60/40, trio, table, full), but every diagram
+  now sits inside a "meter" — a hairline-bordered field with axis ticks — rather than floating on
+  white, so the deck reads as one instrument panel rather than a slideshow.
 
-## Danh sách slide
+## Slide list
 
-| # | Tiêu đề | Bố cục | Hình / tương tác | Bước (data-step) |
+| # | Title | Layout | Visual | Steps |
 |---|---|---|---|---|
-| 1 | Rate limiter ở LoanBud | cover | Thẻ `429 Too Many Requests` | — |
-| 2 | Hai chiều, không có gateway | full | Sơ đồ client → ALB → pod → vendor | 1: hộp "WAF/nginx/ingress: không có" |
-| 3 | Thùng 5 token, nạp 5 token mỗi giây | split | Gantt 10 luồng gọi cùng lúc | 1: luồng 6–10 |
-| 4 | Mượn trước rồi ngủ đúng phần thiếu | split | Code `LendingWiseRatePacer.acquire()` | 1–3: ba ý |
-| 5 | Leaky bucket: xả đều, không cho burst | split | Lý tưởng vs sweep HubSpot (chia nguyên) | 1: ghi chú chia nguyên |
-| 6 | Fixed window và cú dồn ở ranh giới | split | Hai bậc thang chạm limit = 10 | 1: cửa sổ B, 2: ngoặc "19 lần" |
-| 7 | Ba limiter chiều vào | table | Login · Draft · OTP | — |
-| 8 | Login: ba quyết định đúng | trio | Key, 401, hop cuối XFF | — |
-| 9 | Sliding window log | split | Mốc thời gian + ZSET | — |
-| 10 | Sliding window counter | split | Widget kéo thanh trượt | — |
-| 11 | Đếm ở đâu thì limit thật là bao nhiêu | trio | Heap / process / Redis | — |
-| 12 | INCR rồi mới EXPIRE | split | Code hiện tại vs Lua | 1: Lua |
-| 13 | Khi vendor trả 429 | two-up | HubSpot vs LendingWise gate | 1: dải pacer/gate |
-| 14 | Ba kiểu backoff đang chạy | table | Outbox · OCR · service-crm | — |
-| 15 | Không có jitter, 1.000 retry đến cùng lúc | full | Histogram, chuyển 3 chế độ | — |
-| 16 | Ba công thức jitter | split | Bảng + code service-crm | 1: ghi chú ×1.5 |
-| 17 | Có Retry-After vẫn cần jitter | split | Histogram 60s vs 60s + 20% | — |
-| 18 | Năm việc rút ra | list | Chip mức độ | — |
+| 1 | Rate Limiting | cover | Gauge dial hero, needle in the amber zone | — |
+| 2 | Two places a limiter can live | full | Client → gateway → service, service → third party | 1: "gateway: often absent" |
+| 3 | Token bucket: burst, then a steady drip | split | Gantt of 10 concurrent callers against a 5-token bucket | 1: callers 6–10 |
+| 4 | Borrow first, then sleep off the debt | split | Pseudocode `acquire()` | 1–3 |
+| 5 | Leaky bucket: smooth the output, not the input | split | Ideal drip vs. batched drip (integer division) | 1 |
+| 6 | Fixed window: the boundary spike | split | Two windows meeting at a clock boundary | 1, 2 |
+| 7 | Fixed window in the wild | table | Three common uses | — |
+| 8 | Picking the right key | trio | Composite key, status-code parity, trusted hop | — |
+| 9 | Sliding window log | split | Timestamps trimmed against a ZSET | — |
+| 10 | Sliding window counter | split | Interactive slider on the estimate formula | — |
+| 11 | Where the counter lives changes the limit | trio | In-process / shared cache / vendor-side | — |
+| 12 | Two commands, one race | split | `INCR` then `EXPIRE`, and the atomic fix | 1 |
+| 13 | Absorbing a 429 | two-up | Retry-After backpressure vs. a shared circuit gate | 1 |
+| 14 | Three backoff schedules, one has jitter | table | Comparison | — |
+| 15 | Why jitter: the thundering herd | full | Histogram, mode switch (none/equal/full) | — |
+| 16 | Three jitter formulas | split | Table + pseudocode | 1 |
+| 17 | Retry-After still needs jitter | full | Histogram, exact vs. +20% | — |
+| 18 | Takeaways | list | Five points | — |
 
-## Phím tắt (giống repo tham khảo)
+## Keyboard
 
-`→` / `Space` bước kế · `←` lùi · `N` ghi chú người nói · `O` lưới tổng quan · `F` toàn màn hình ·
-`#6.2` link thẳng tới slide 6 bước 2 · In ra PDF: mỗi slide một trang, mọi bước hiện sẵn.
+`→` / `Space` next step · `←` back · `N` speaker notes · `O` overview grid · `T` toggle theme ·
+`F` fullscreen · `#6.2` deep-link to slide 6, step 2 · print → one page per slide, all steps shown.
+
+## Deploying to GitHub Pages
+
+No build step. Push this folder to a repo, then in **Settings → Pages** choose
+**Deploy from a branch**, branch `main`, folder `/ (root)` — or `/docs` if you'd rather nest it.
+`.nojekyll` is included so GitHub doesn't run the Jekyll build over the `deck.js`/`widgets.js`
+files.

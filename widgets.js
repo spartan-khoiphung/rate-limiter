@@ -9,7 +9,7 @@
     return node;
   };
   const scale = (d0, d1, r0, r1) => (v) => r0 + ((v - d0) / (d1 - d0)) * (r1 - r0);
-  const fmt = (n, digits = 0) => n.toLocaleString('vi-VN', { maximumFractionDigits: digits, minimumFractionDigits: digits });
+  const fmt = (n, digits = 0) => n.toLocaleString('en-US', { maximumFractionDigits: digits, minimumFractionDigits: digits });
   const $ = (id) => document.getElementById(id);
 
   // Deterministic so the chart looks the same on every load and in print.
@@ -22,9 +22,9 @@
     };
   }
 
-  // Slide 3: 10 threads call acquire() at t=0 against a 5-token bucket refilled at 5/s.
+  // Slide 3: 10 callers hit acquire() at t=0 against a 5-token bucket refilled at 5/s.
   function tokenGantt(svg) {
-    const W = 600, H = 330, L = 78, R = 40, T = 10, B = 40;
+    const W = 600, H = 330, L = 96, R = 40, T = 10, B = 40;
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
     const x = scale(0, 1200, L, W - R);
     const rows = 10, rh = (H - T - B) / rows;
@@ -34,32 +34,32 @@
     }
     el('line', { x1: L, x2: W - R, y1: H - B, y2: H - B, class: 'sv-axis' }, svg);
     for (let i = 0; i < rows; i++) {
-      // tokens after the first five reservations go negative; each thread sleeps its deficit / rate
+      // Tokens after the first five reservations go negative; each caller sleeps its own deficit.
       const wait = i < 5 ? 0 : (i - 4) * 200;
       const cy = T + rh * i + rh / 2;
       const g = el('g', i < 5 ? {} : { 'data-step': 1 }, svg);
-      el('text', { x: L - 14, y: cy + 4.5, class: 'sv-tick', 'text-anchor': 'end' }, g, `luồng ${i + 1}`);
+      el('text', { x: L - 14, y: cy + 4.5, class: 'sv-tick', 'text-anchor': 'end' }, g, `caller ${i + 1}`);
       if (wait > 0) el('rect', { x: x(0), y: cy - 5, width: x(wait) - x(0), height: 10, rx: 5, class: 'sv-wait' }, g);
       el('circle', { cx: x(wait), cy, r: 7, class: 'sv-mark' }, g);
     }
   }
 
-  // Slide 5: ideal leaky bucket vs HubSpot sweep delaySeconds = sequence / k (integer division).
+  // Slide 5: ideal leaky bucket vs. a sweep that batches with integer division (delay = i / k).
   function leaky(svg) {
-    const W = 600, H = 250, L = 150, R = 24, T = 14, B = 40, k = 3, n = 20;
+    const W = 600, H = 250, L = 168, R = 24, T = 14, B = 40, k = 3, n = 20;
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
     const x = scale(0, 7, L, W - R);
     for (let s = 0; s <= 7; s++) {
       el('line', { x1: x(s), x2: x(s), y1: T, y2: H - B, class: 'sv-grid' }, svg);
-      el('text', { x: x(s), y: H - B + 24, class: 'sv-tick', 'text-anchor': 'middle' }, svg, `${s} s`);
+      el('text', { x: x(s), y: H - B + 24, class: 'sv-tick', 'text-anchor': 'middle' }, svg, `${s}s`);
     }
     el('line', { x1: L, x2: W - R, y1: H - B, y2: H - B, class: 'sv-axis' }, svg);
 
     const y1 = 58, y2 = 150;
-    el('text', { x: L - 16, y: y1 - 2, class: 'sv-lbl', 'text-anchor': 'end' }, svg, 'Leaky bucket');
-    el('text', { x: L - 16, y: y1 + 16, class: 'sv-lbl-sm', 'text-anchor': 'end' }, svg, 'đều mỗi 333 ms');
-    el('text', { x: L - 16, y: y2 - 2, class: 'sv-lbl', 'text-anchor': 'end' }, svg, 'Sweep HubSpot');
-    el('text', { x: L - 16, y: y2 + 16, class: 'sv-lbl-sm', 'text-anchor': 'end' }, svg, `mẻ ${k} job mỗi giây`);
+    el('text', { x: L - 16, y: y1 - 2, class: 'sv-lbl', 'text-anchor': 'end' }, svg, 'Ideal leaky bucket');
+    el('text', { x: L - 16, y: y1 + 16, class: 'sv-lbl-sm', 'text-anchor': 'end' }, svg, 'even, every 333 ms');
+    el('text', { x: L - 16, y: y2 - 2, class: 'sv-lbl', 'text-anchor': 'end' }, svg, 'Batched sweep');
+    el('text', { x: L - 16, y: y2 + 16, class: 'sv-lbl-sm', 'text-anchor': 'end' }, svg, `groups of ${k} per second`);
     for (let i = 0; i < n; i++) {
       el('circle', { cx: x(i / k), cy: y1 + 4, r: 6, class: 'sv-ink' }, svg);
       const sec = Math.floor(i / k);
@@ -67,29 +67,29 @@
     }
   }
 
-  // Slide 6: Caffeine expireAfterWrite window starts at the key's first attempt, not on the clock.
+  // Slide 6: a naive expireAfterWrite window starts at the key's first hit, not on the clock.
   function fixedWindow(svg) {
-    const W = 600, H = 330, L = 44, R = 70, T = 40, B = 44;
+    const W = 600, H = 330, L = 44, R = 76, T = 40, B = 44;
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
-    const x = scale(0, 40, L, W - R); // seconds after 14:59:40
+    const x = scale(0, 40, L, W - R); // seconds after 09:59:40
     const y = scale(0, 11, H - B, T);
     el('rect', { x: x(0), y: T, width: x(20) - x(0), height: H - B - T, class: 'sv-band' }, svg);
-    el('text', { x: x(0) + 8, y: T + 18, class: 'sv-lbl-sm' }, svg, 'Cửa sổ A · mở 14:45:00');
+    el('text', { x: x(0) + 8, y: T + 18, class: 'sv-lbl-sm' }, svg, 'Window A · opened 09:45:00');
     const bandB = el('g', { 'data-step': 1 }, svg);
     el('rect', { x: x(25), y: T, width: x(40) - x(25), height: H - B - T, class: 'sv-band-hot' }, bandB);
-    el('text', { x: x(25) + 8, y: T + 18, class: 'sv-lbl-sm' }, bandB, 'Cửa sổ B · mở 15:00:05');
+    el('text', { x: x(25) + 8, y: T + 18, class: 'sv-lbl-sm' }, bandB, 'Window B · opened 10:00:05');
 
     for (let c = 0; c <= 10; c += 2) {
       el('line', { x1: L, x2: W - R, y1: y(c), y2: y(c), class: 'sv-grid' }, svg);
       el('text', { x: L - 10, y: y(c) + 4.5, class: 'sv-tick', 'text-anchor': 'end' }, svg, c);
     }
-    const ticks = [[0, '14:59:40'], [10, '14:59:50'], [20, '15:00:00'], [30, '15:00:10'], [40, '15:00:20']];
+    const ticks = [[0, '09:59:40'], [10, '09:59:50'], [20, '10:00:00'], [30, '10:00:10'], [40, '10:00:20']];
     ticks.forEach(([s, label]) => el('text', { x: x(s), y: H - B + 24, class: 'sv-tick', 'text-anchor': 'middle' }, svg, label));
     el('line', { x1: L, x2: W - R, y1: H - B, y2: H - B, class: 'sv-axis' }, svg);
     el('line', { x1: L, x2: W - R, y1: y(10), y2: y(10), class: 'sv-limit' }, svg);
     el('text', { x: W - R + 8, y: y(10) + 5, class: 'sv-hot' }, svg, 'limit 10');
 
-    el('text', { x: x(0) + 8, y: y(1) + 4, class: 'sv-lbl-sm' }, svg, '← lần 1 lúc 14:45:00');
+    el('text', { x: x(0) + 8, y: y(1) + 4, class: 'sv-lbl-sm' }, svg, '← 1st hit at 09:45:00');
     const gap = 0.75;
     for (let c = 2; c <= 10; c++) el('circle', { cx: x(10 + (c - 2) * gap), cy: y(c), r: 5.5, class: 'sv-ink' }, svg);
     const stepB = el('g', { 'data-step': 1 }, svg);
@@ -100,10 +100,10 @@
     const by = y(10) - 20;
     el('path', { d: `M${x(first)} ${by + 8} V${by} H${x(last)} V${by + 8}`, class: 'sv-line' }, brace);
     el('text', { x: (x(first) + x(last)) / 2, y: by - 8, class: 'sv-lbl', 'text-anchor': 'middle' }, brace,
-      `19 lần thử trong ${Math.round(last - first)} giây, không lần nào bị chặn`);
+      `19 hits in ${Math.round(last - first)} seconds, none of them rejected`);
   }
 
-  // Slide 9: request timestamps kept in a ZSET; everything older than now − 15m is trimmed.
+  // Slide 9: request timestamps kept in a sorted set; anything older than now − 15m is trimmed.
   function slidingLog(svg) {
     const W = 600, H = 190, L = 20, R = 20, T = 30, B = 44;
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
@@ -111,15 +111,15 @@
     const times = [2, 4.5, 6, 9, 11.5, 13.5, 16, 17.5, 19, 22, 23.5, 26, 27.5, 29.2];
     el('rect', { x: x(15), y: T, width: x(30) - x(15), height: H - B - T, rx: 10, class: 'sv-band-hot' }, svg);
     const live = times.filter((t) => t >= 15).length;
-    el('text', { x: x(15) + 10, y: T + 20, class: 'sv-lbl' }, svg, `15 phút gần nhất: ${live} mốc`);
-    el('text', { x: x(0) + 4, y: T + 20, class: 'sv-lbl-sm' }, svg, 'ZREMRANGEBYSCORE xoá');
+    el('text', { x: x(15) + 10, y: T + 20, class: 'sv-lbl' }, svg, `last 15 minutes: ${live} timestamps`);
+    el('text', { x: x(0) + 4, y: T + 20, class: 'sv-lbl-sm' }, svg, 'trimmed by score');
     el('line', { x1: L, x2: W - R, y1: H - B, y2: H - B, class: 'sv-axis' }, svg);
     times.forEach((t) => {
       const old = t < 15;
       el('circle', { cx: x(t), cy: T + 62, r: 7, class: old ? 'sv-old' : 'sv-mark' }, svg);
       if (old) el('line', { x1: x(t) - 7, x2: x(t) + 7, y1: T + 69, y2: T + 55, class: 'sv-strike' }, svg);
     });
-    [[0, 'now − 30 phút', 'start'], [15, 'now − 15 phút', 'middle'], [30, 'now', 'end']].forEach(([t, label, anchor]) =>
+    [[0, 'now − 30 min', 'start'], [15, 'now − 15 min', 'middle'], [30, 'now', 'end']].forEach(([t, label, anchor]) =>
       el('text', { x: x(t), y: H - B + 24, class: 'sv-tick', 'text-anchor': anchor }, svg, label));
   }
 
@@ -143,7 +143,7 @@
       const est = c + weighted;
       $('sw-prev-o').textContent = p;
       $('sw-curr-o').textContent = c;
-      $('sw-el-o').textContent = `${e} phút`;
+      $('sw-el-o').textContent = `${e} min`;
       const cw = Math.min(x(c), x(MAX)) - x(0);
       rCurr.setAttribute('width', Math.max(0, cw));
       rPrev.setAttribute('x', x(0) + cw);
@@ -152,8 +152,8 @@
       $('sw-calc').innerHTML = `${c} + ${p} × (1 − ${e}/15) = <b>${fmt(est, 1)}</b>`;
       const pass = est < LIMIT;
       const v = $('sw-verdict');
-      v.textContent = pass ? 'Cho qua' : 'Chặn';
-      v.className = pass ? 'chip ink' : 'chip hot';
+      v.textContent = pass ? 'Allowed' : 'Rejected';
+      v.className = pass ? 'chip ok' : 'chip risk';
     }
     [prev, curr, elapsed].forEach((i) => i.addEventListener('input', update));
     update();
@@ -161,7 +161,7 @@
 
   // Slides 15 and 17: histogram of retry arrivals with a mode switch.
   function histogram({ svg, seg, readout, domain: [a, b], bin, ymax, yStep, xStep, xUnit, modes, describe }) {
-    const W = 1100, H = 300, L = 56, R = 16, T = 12, B = 40;
+    const W = 1100, H = 300, L = 60, R = 16, T = 12, B = 40;
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
     const x = scale(a, b, L, W - R);
     const y = scale(0, ymax, H - B, T);
@@ -214,13 +214,13 @@
     };
     histogram({
       svg: $('herd'), seg: $('herd-seg'), readout: $('herd-readout'),
-      domain: [0, 300], bin: 5, ymax: 1000, yStep: 250, xStep: 30, xUnit: ' s',
+      domain: [0, 300], bin: 5, ymax: 1000, yStep: 250, xStep: 30, xUnit: 's',
       modes: {
         none: () => schedule((base) => base),
         equal: () => schedule((base, r) => base / 2 + r() * (base / 2)),
         full: () => schedule((base, r) => r() * base),
       },
-      describe: (peak, at) => `Đỉnh: <b>${fmt(peak)}</b> request trong 5 giây, bắt đầu ở giây ${at}`,
+      describe: (peak, at) => `Peak: <b>${fmt(peak)}</b> requests in one 5-second bin, starting at t = ${at}s`,
     });
   }
 
@@ -228,12 +228,12 @@
     const JOBS = 400, RETRY_AFTER = 60;
     histogram({
       svg: $('ra'), seg: $('ra-seg'), readout: $('ra-readout'),
-      domain: [55, 80], bin: 1, ymax: 400, yStep: 100, xStep: 5, xUnit: ' s',
+      domain: [55, 80], bin: 1, ymax: 400, yStep: 100, xStep: 5, xUnit: 's',
       modes: {
         exact: () => new Array(JOBS).fill(RETRY_AFTER),
         jitter: () => { const r = rng(11); return Array.from({ length: JOBS }, () => RETRY_AFTER + r() * RETRY_AFTER * 0.2); },
       },
-      describe: (peak, at) => `Đỉnh: <b>${fmt(peak)}</b> job trong 1 giây, ở giây ${at}`,
+      describe: (peak, at) => `Peak: <b>${fmt(peak)}</b> retries in one 1-second bin, at t = ${at}s`,
     });
   }
 

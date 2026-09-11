@@ -1,5 +1,4 @@
-// Keyboard deck in the style of slides-vibe-coding-sops: data-step reveals, #slide.step links,
-// N speaker notes, O overview grid, F fullscreen.
+// Keyboard-driven deck: data-step reveals, #slide.step deep links, N notes, O overview, T theme, F fullscreen.
 (() => {
   const deck = document.getElementById('deck');
   const slides = [...deck.querySelectorAll('.slide')];
@@ -7,7 +6,7 @@
   const pager = document.querySelector('.pager');
   const notesPanel = document.querySelector('.notes-panel');
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const fmt = (n) => n.toLocaleString('vi-VN');
+  const fmt = (n) => n.toLocaleString('en-US');
 
   let current = 0;
   let step = 0;
@@ -37,7 +36,7 @@
     bar.style.width = `${((current + 1) / slides.length) * 100}%`;
     pager.textContent = `${current + 1} / ${slides.length}`;
     const notes = slide.querySelector('.notes');
-    notesPanel.innerHTML = `<h3>Ghi chú người nói · slide ${current + 1}</h3>${notes ? notes.innerHTML : '<p>Không có ghi chú.</p>'}`;
+    notesPanel.innerHTML = `<h3>Speaker notes · slide ${current + 1}</h3>${notes ? notes.innerHTML : '<p>No notes for this slide.</p>'}`;
     history.replaceState(null, '', `#${current + 1}.${step}`);
   }
 
@@ -73,6 +72,18 @@
     if (on) slides[current].scrollIntoView({ block: 'center' });
   };
 
+  function applyStoredTheme() {
+    const saved = localStorage.getItem('rl-theme');
+    if (saved) document.documentElement.dataset.theme = saved;
+  }
+  function toggleTheme() {
+    const isDark = matchMedia('(prefers-color-scheme: dark)').matches;
+    const current = document.documentElement.dataset.theme || (isDark ? 'dark' : 'light');
+    const next = current === 'dark' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem('rl-theme', next); } catch { /* private mode: theme just won't persist */ }
+  }
+
   document.addEventListener('keydown', (e) => {
     if (e.metaKey || e.ctrlKey || e.altKey || e.target.matches('input')) return;
     const overview = document.body.classList.contains('overview');
@@ -85,6 +96,7 @@
       case 'End': go(slides.length - 1, maxStep(slides[slides.length - 1])); break;
       case 'n': case 'N': notesPanel.hidden = !notesPanel.hidden; break;
       case 'o': case 'O': toggleOverview(); break;
+      case 't': case 'T': toggleTheme(); break;
       case 'Escape': toggleOverview(false); notesPanel.hidden = true; break;
       case 'f': case 'F':
         if (document.fullscreenElement) document.exitFullscreen();
@@ -105,6 +117,7 @@
 
   addEventListener('resize', fit);
   addEventListener('hashchange', fromHash);
+  applyStoredTheme();
   fit();
   render(true);
   fromHash();
