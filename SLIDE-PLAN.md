@@ -11,25 +11,23 @@ plus a GitHub Actions workflow that publishes it on every push.
 A dark instrument panel in the spirit of a terminal-style slide deck: near-black surfaces, visible
 (not merely hairline) borders tinted with the accent, monospace labels, and a signature move —
 each major section opens on a divider slide with a huge outline numeral, echoing a printed
-technical-report cover. Two tones carry the whole system rather than one loud accent: a muted
-brick red (`--accent`) and a soft, desaturated blue (`--accent2`), used together — never as
-competing accents, always as one pairing — on the handful of elements meant to read as the
-deck's signature: the left edge strip, the top rule on every slide, and the divider's numeral +
-section tag. Both are kept muted (no neon saturation) so the pairing reads as considered rather
-than loud. Semantic green/orange exist only as text — for the allow/reject verdicts a rate
-limiter actually produces — and stay clearly apart from the brand pairing. A thin hand-drawn icon
-sprite (bucket, pipe, window, ledger, gauge, clock, die) sits in a tinted circular plate at the
-head of every section and card, doing double duty as illustration.
+technical-report cover. The accent is a single console teal — a terminal-cursor color, not a
+brand color — carried at two lightness steps (a bright `--accent` for text/marks, a deeper
+`--accent2` for gradients and depth) rather than as two competing hues. Amber/orange is held in
+reserve for "reject" alone, so it reads as a warning the moment it appears rather than a color
+that's already been spent decorating something else. A thin hand-drawn icon sprite (bucket, pipe,
+window, ledger, gauge, clock, die) sits in a tinted circular plate at the head of every section
+and card, doing double duty as illustration.
 
-- **Color**: paper `#0C0808` (dark) / `#F7F7F7` (light) · surface `#170F0F` / `#FFFFFF` ·
-  ink, body, muted scaled off a warm near-black rather than pure grey · accent (muted brick red)
-  `#C96B64` (dark) / `#B8524F` (light) · accent2 (soft desaturated blue) `#7E9AB8` (dark) /
-  `#5C7A99` (light) · panel-border = accent at ~30% alpha, used on every card/meter/gauge-card
-  instead of a neutral hairline, so borders read as "on" rather than merely structural · reject
-  (text-only, warm orange, kept apart from the brand red) · allow (text-only, muted green). One
-  shadow tier, used only where something floats above the deck (the slide itself, the notes
-  overlay). Toggled with `t`, otherwise follows system — the dark recipe is the one this deck is
-  designed around; light swaps the same tokens onto a paper ground.
+- **Color**: paper `#081112` (dark) / `#F4F8F8` (light) · surface `#0F1A1B` / `#FFFFFF` · ink,
+  body, muted scaled off a cool near-black rather than pure grey · accent (console teal) `#3FC7D4`
+  (dark) / `#1B8A93` (light) · accent2 (deeper teal, for gradients) `#1E8F99` (dark) / `#4FB8C2`
+  (light) · panel-border = accent at ~30–35% alpha, used on every card/meter/gauge-card instead of
+  a neutral hairline, so borders read as "on" rather than merely structural · reject (text-only,
+  amber — the only other color in the system) · allow (text-only, muted green). One shadow tier,
+  used only where something floats above the deck (the slide itself, the notes overlay). Toggled
+  with `t`, otherwise follows system — the dark recipe is the one this deck is designed around;
+  light swaps the same tokens onto a paper ground.
 - **Type**: **Inter** for headings and body, weight bumped to 600 for presence (400 read as too
   flat for a title slide); **JetBrains Mono** for pseudocode, data, schematic labels, and the
   divider's "SECTION n" tag.
@@ -37,9 +35,8 @@ head of every section and card, doing double duty as illustration.
   and the gauge card use a `24px` radius with a visible accent-tinted border; inputs and code
   blocks stay at `12px`.
 - **Signature move — section dividers**: five divider slides (one per act) carry a numeral in
-  large outline type (`-webkit-text-stroke`, transparent fill) in the accent red, a dash-and-label
-  "SECTION n" tag in the soft blue directly beneath it — the one place the two tones sit side by
-  side as a deliberate pairing — then the act's title and one-line thesis.
+  large outline type (`-webkit-text-stroke`, transparent fill) in teal, with a dash-and-label
+  "SECTION n" tag directly beneath it, then the act's title and one-line thesis.
 - **Layout**: same reusable layouts as before (split 60/40, trio, table, full), but every diagram
   sits inside a "meter" — a bordered field with axis ticks — rather than floating free, so the
   deck reads as one instrument panel rather than a slideshow.

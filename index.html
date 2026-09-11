@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Rate Limiting</title>
 <meta name="description" content="A systems lecture on the five rate-limiting algorithms, where they live in an architecture, and why backoff needs jitter." />
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='11' fill='%230a0b0d'/%3E%3Cpath d='M12 6v6l4 2' stroke='%230052ff' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='11' fill='%23081112'/%3E%3Cpath d='M12 6v6l4 2' stroke='%233fc7d4' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -15,26 +15,27 @@
    left edge strip. Semantic green stays text-only for "allow"; "reject" sits one step warmer
    than the brand red so a rejected-request chip never reads as just another brand mention.
    Tokens declared once on :root, redefined for dark under both the media query and the
-   explicit toggle, per the three-theme-state rule. */
+   explicit toggle, per the three-theme-state rule. Accent is teal — a console-terminal color,
+   not a brand color — with amber/orange held in reserve for "reject" only. */
 :root {
-  --paper: #f7f7f7;
-  --ink: #16090a;
-  --body: #5c4749;
-  --muted: #8a7476;
-  --muted-soft: #b3a3a4;
-  --hairline: #e6d9da;
-  --hairline-soft: #f1e9e9;
+  --paper: #f4f8f8;
+  --ink: #0a1516;
+  --body: #445456;
+  --muted: #718688;
+  --muted-soft: #a3b3b4;
+  --hairline: #dbe6e7;
+  --hairline-soft: #eef4f4;
   --surface: #ffffff;
-  --surface-alt: #f6eeee;
-  --accent: #b8524f;
-  --accent-strong: #96403d;
-  --accent2: #5c7a99;
-  --accent-wash: #f7e9e7;
-  --panel-border: rgba(184, 82, 79, 0.28);
-  --reject: #b06a2e;
-  --reject-wash: #f7ece1;
+  --surface-alt: #eaf3f3;
+  --accent: #1b8a93;
+  --accent-strong: #146670;
+  --accent2: #4fb8c2;
+  --accent-wash: #e0f3f4;
+  --panel-border: rgba(27, 138, 147, 0.28);
+  --reject: #b3651f;
+  --reject-wash: #f8ece0;
   --allow: #2f7d5c;
-  --shadow: 0 4px 12px rgba(22, 9, 10, 0.07);
+  --shadow: 0 4px 12px rgba(10, 21, 22, 0.07);
   --r-sm: 8px;
   --r-md: 12px;
   --r-xl: 24px;
@@ -48,45 +49,45 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --paper: #0c0808;
-    --ink: #f8f0ef;
-    --body: #cdb9b8;
-    --muted: #9c8888;
-    --muted-soft: #5f4e4e;
-    --hairline: #362323;
-    --hairline-soft: #241818;
-    --surface: #170f0f;
-    --surface-alt: #221515;
-    --accent: #c96b64;
-    --accent-strong: #dd8e83;
-    --accent2: #7e9ab8;
-    --accent-wash: #2b1614;
-    --panel-border: rgba(201, 107, 100, 0.32);
-    --reject: #c98354;
-    --reject-wash: #2a1c10;
-    --allow: #6bab8b;
+    --paper: #081112;
+    --ink: #eef7f8;
+    --body: #b9c8c9;
+    --muted: #7f9294;
+    --muted-soft: #4c5c5e;
+    --hairline: #1e2c2d;
+    --hairline-soft: #141f20;
+    --surface: #0f1a1b;
+    --surface-alt: #162324;
+    --accent: #3fc7d4;
+    --accent-strong: #83e2ea;
+    --accent2: #1e8f99;
+    --accent-wash: #0f2c30;
+    --panel-border: rgba(63, 199, 212, 0.35);
+    --reject: #e0a542;
+    --reject-wash: #2c2211;
+    --allow: #5fcf9e;
     --shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
     color-scheme: dark;
   }
 }
 :root[data-theme='dark'] {
-  --paper: #0c0808;
-  --ink: #f8f0ef;
-  --body: #cdb9b8;
-  --muted: #9c8888;
-  --muted-soft: #5f4e4e;
-  --hairline: #362323;
-  --hairline-soft: #241818;
-  --surface: #170f0f;
-  --surface-alt: #221515;
-  --accent: #c96b64;
-  --accent-strong: #dd8e83;
-  --accent2: #7e9ab8;
-  --accent-wash: #2b1614;
-  --panel-border: rgba(201, 107, 100, 0.32);
-  --reject: #c98354;
-  --reject-wash: #2a1c10;
-  --allow: #6bab8b;
+  --paper: #081112;
+  --ink: #eef7f8;
+  --body: #b9c8c9;
+  --muted: #7f9294;
+  --muted-soft: #4c5c5e;
+  --hairline: #1e2c2d;
+  --hairline-soft: #141f20;
+  --surface: #0f1a1b;
+  --surface-alt: #162324;
+  --accent: #3fc7d4;
+  --accent-strong: #83e2ea;
+  --accent2: #1e8f99;
+  --accent-wash: #0f2c30;
+  --panel-border: rgba(63, 199, 212, 0.35);
+  --reject: #e0a542;
+  --reject-wash: #2c2211;
+  --allow: #5fcf9e;
   --shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
   color-scheme: dark;
 }
@@ -440,7 +441,7 @@ body.overview .progress, body.overview .pager { display: none; }
             <circle cx="110" cy="120" r="7" class="sv-ink"/>
             <text x="110" y="145" text-anchor="middle" class="sv-lbl-sm">throttled</text>
           </svg>
-          <figcaption>The needle sits in the red band the moment a caller is asked to slow down.</figcaption>
+          <figcaption>The needle sits in the teal band the moment a caller is asked to slow down.</figcaption>
         </figure>
       </div>
       <div class="notes"><p>Open with the two places a limiter matters: protecting your own system from callers, and behaving as a well-mannered client of someone else's API. Everything in this deck maps to one of those two roles.</p></div>
