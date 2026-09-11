@@ -43,10 +43,37 @@ head of every section and card, doing double duty as illustration.
 - **Layout**: same reusable layouts as before (split 60/40, trio, table, full), but every diagram
   sits inside a "meter" — a bordered field with axis ticks — rather than floating free, so the
   deck reads as one instrument panel rather than a slideshow.
+- **Motion**: every slide's own top-level children (eyebrow → title → body) cascade in with a
+  100ms stagger once the slide becomes active, instead of the whole slide appearing as one block —
+  the deck-wide fix for reading as monotonous. Slide-to-slide navigation crossfades + rises.
+
+## Two live diagrams, not screenshots
+
+The topology slide (§01) and the token-bucket flow embed real interactive diagrams generated with
+[Archify](https://github.com/tt-a1i/archify) instead of static in-deck SVG: pan, zoom, theme
+toggle, and an "Open full screen ↗" link out to `diagrams/*.html`. Source specs live alongside the
+delivered HTML in `diagrams/` (`*.architecture.json`, `*.workflow.json`) — regenerate with:
+
+```bash
+npx skills add tt-a1i/archify -g   # once, installs the skill
+node ~/.claude/skills/archify/bin/archify.mjs deliver workflow \
+  diagrams/token-bucket-flow.workflow.json diagrams/token-bucket-flow.html --quality showcase
+node ~/.claude/skills/archify/bin/archify.mjs deliver architecture \
+  diagrams/request-topology.architecture.json diagrams/request-topology.html --quality showcase
+```
+
+## Hands-on demo (`demo.html`)
+
+A separate page, linked from the "Open it in four tabs and get throttled" slide: a real token
+bucket (capacity 5, refill 1/s) implemented in `localStorage`, shared across every tab open on the
+same origin. A mode toggle switches between a correctly shared bucket and a deliberately buggy
+per-tab bucket, reproducing the "in-process memory ⇒ limit × replica count" problem live. The
+shared bucket's read-modify-write is intentionally non-atomic across tabs — the same race the
+lecture warns about — rather than papered over with a lock the real bug doesn't have.
 
 ## Slide list
 
-Five acts, each opened by a divider slide (bold row below).
+Five acts, each opened by a divider slide (bold row below); a hands-on demo slide sits near the end.
 
 | # | Title | Layout | Visual | Steps |
 |---|---|---|---|---|
@@ -71,8 +98,9 @@ Five acts, each opened by a divider slide (bold row below).
 | 19 | Why jitter: the thundering herd | full | Histogram, mode switch (none/equal/full) | — |
 | 20 | Three jitter formulas | split | Table + pseudocode | 1 |
 | 21 | Retry-After still needs jitter | full | Histogram, exact vs. +20% | — |
-| **22** | **§05 — Takeaways** | **divider** | **Outline "05"** | — |
-| 23 | Takeaways | list | Five points | — |
+| 22 | Open it in four tabs and get throttled | split | Link out to `demo.html` | — |
+| **23** | **§05 — Takeaways** | **divider** | **Outline "05"** | — |
+| 24 | Takeaways | list | Five points | — |
 
 ## Keyboard
 

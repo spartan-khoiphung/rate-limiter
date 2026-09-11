@@ -1,0 +1,52 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Token Bucket Pacer",
+    "animation": "trace",
+    "quality_profile": "showcase"
+  },
+  "lanes": [
+    { "id": "path", "label": "Fast Path" },
+    { "id": "wait", "label": "Backpressure", "variant": "exception" }
+  ],
+  "groups": [
+    { "id": "debt_group", "label": "Debt & backoff", "lane": "wait", "fromCol": 2, "toCol": 3, "variant": "dashed" }
+  ],
+  "mainPath": ["caller", "bucket", "decision", "proceed", "thirdparty"],
+  "nodes": [
+    { "id": "caller", "lane": "path", "col": 0, "type": "frontend", "label": "Caller", "sublabel": "wants to reach the vendor", "width": 132 },
+    { "id": "bucket", "lane": "path", "col": 1, "type": "backend", "label": "Token Bucket", "sublabel": "capacity 5 · refill 5/s", "tag": "one per process", "width": 132 },
+    { "id": "decision", "lane": "path", "col": 2, "type": "backend", "label": "Tokens available?", "sublabel": "check + reserve", "width": 132 },
+    { "id": "proceed", "lane": "path", "col": 3, "type": "backend", "label": "Call Proceeds", "sublabel": "token reserved", "width": 132 },
+    { "id": "thirdparty", "lane": "path", "col": 4, "type": "external", "label": "Vendor API", "sublabel": "shares one rate limit", "width": 132 },
+    { "id": "borrow", "lane": "wait", "col": 2, "type": "messagebus", "label": "Borrow Into Debt", "sublabel": "tokens go negative", "width": 132 },
+    { "id": "sleep", "lane": "wait", "col": 3, "type": "messagebus", "label": "Sleep the Deficit", "sublabel": "deficit ÷ rate, in ms", "tag": "own wake time", "width": 132 }
+  ],
+  "edges": [
+    { "id": "caller-bucket", "from": "caller", "to": "bucket", "variant": "default" },
+    { "id": "bucket-decision", "from": "bucket", "to": "decision", "variant": "default" },
+    { "id": "decision-proceed", "from": "decision", "to": "proceed", "label": "yes", "variant": "emphasis" },
+    { "id": "proceed-thirdparty", "from": "proceed", "to": "thirdparty", "variant": "default" },
+    { "id": "decision-borrow", "from": "decision", "to": "borrow", "label": "no — reserve anyway", "variant": "dashed", "role": "branch" },
+    { "id": "borrow-sleep", "from": "borrow", "to": "sleep", "variant": "dashed" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Why no two callers wake together",
+      "items": [
+        "Every caller reserves its token before sleeping, so the bucket is already more negative for the next one",
+        "Each caller computes and sleeps its own deficit — ten concurrent callers end up paced 200ms apart, not racing the same refill tick"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Bounded wait",
+      "items": [
+        "A computed wait past the configured cap raises a rate-limit error instead of sleeping",
+        "A busy window surfaces fast to the caller rather than stalling a whole batch"
+      ]
+    }
+  ]
+}

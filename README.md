@@ -1,9 +1,14 @@
 # Rate Limiting
 
-A self-contained slide deck on the five rate-limiting algorithms, where a limiter belongs in an
-architecture, and why exponential backoff needs jitter. Everything — markup, styles, and the chart
-scripts — lives in a single `index.html`, so it opens correctly straight off disk, from a Slack
-attachment, or from GitHub Pages, with no separate files that can go missing or fail to resolve.
+A slide deck on the five rate-limiting algorithms, where a limiter belongs in an architecture, and
+why exponential backoff needs jitter. The deck itself — markup, styles, chart scripts — is one
+self-contained `index.html`, so it opens correctly straight off disk, from a Slack attachment, or
+from GitHub Pages. Two pages sit alongside it:
+
+- **`diagrams/`** — the architecture and token-bucket-flow diagrams, generated as live, pannable
+  HTML with [Archify](https://github.com/tt-a1i/archify) and embedded in the deck.
+- **`demo.html`** — a hands-on page: open it in a few tabs and watch a real token bucket (shared
+  through `localStorage`) throttle you across all of them.
 
 ## View it locally
 

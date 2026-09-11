@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Two Directions Through a Rate Limiter",
+    "animation": "trace",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    { "id": "client", "type": "external", "label": "Caller", "sublabel": "browser / mobile", "pos": [40, 260], "size": [130, 60] },
+    { "id": "gateway", "type": "cloud", "label": "API Gateway", "sublabel": "often absent", "pos": [250, 260], "size": [130, 60], "tag": "optional" },
+    { "id": "app", "type": "backend", "label": "Application", "sublabel": "enforces the limit", "pos": [460, 260], "size": [140, 60] },
+    { "id": "store", "type": "database", "label": "Limiter Store", "sublabel": "in-process OR shared Redis", "pos": [460, 110], "size": [140, 60] },
+    { "id": "gate", "type": "security", "label": "Circuit Gate", "sublabel": "closes on 429", "pos": [670, 260], "size": [130, 60] },
+    { "id": "vendor", "type": "external", "label": "Third-Party API", "sublabel": "has its own limit", "pos": [880, 260], "size": [140, 60] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Your system", "wraps": ["gateway", "app", "store"] }
+  ],
+  "connections": [
+    { "id": "client-gateway", "from": "client", "to": "gateway", "label": "request", "variant": "dashed" },
+    { "id": "gateway-app", "from": "gateway", "to": "app", "variant": "default" },
+    { "id": "app-store", "from": "app", "to": "store", "label": "count + gate", "fromSide": "top", "toSide": "bottom", "labelDy": -58 },
+    { "id": "app-gate", "from": "app", "to": "gate", "label": "outbound call", "variant": "emphasis" },
+    { "id": "gate-vendor", "from": "gate", "to": "vendor", "variant": "default" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Inbound — protecting yourself", "items": ["Gateway enforcement is tidy but often skipped", "The application enforces the limit either way, reading a store that may or may not be shared across replicas"] },
+    { "dot": "rose", "title": "Outbound — being a good client", "items": ["The circuit gate closes for every caller after one 429, not just the one that got rejected", "The vendor's own limit is invisible except through its response headers"] }
+  ]
+}
