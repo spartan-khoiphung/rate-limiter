@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Rate limiter ở LoanBud</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="deck.css" />
+</head>
+<body>
+<div class="stage">
+  <div class="deck" id="deck">
+
+    <!-- 1 — cover -->
+    <section class="slide" data-section="cover">
+      <div class="cover-grid">
+        <div class="stack">
+          <div class="eyebrow">LoanBud · Backyard, Portal, service-io, service-crm</div>
+          <h1 class="display">Rate limiter<br />ở LoanBud</h1>
+          <p class="lead">Năm cơ chế đếm request, đối chiếu với code thật đang chạy: chặn ở chiều vào (login, OTP, draft application) và tự bảo vệ ở chiều ra khi gọi LendingWise, HubSpot.</p>
+        </div>
+        <figure class="http-card">
+          <div class="http-status"><span class="num">429</span><span>Too Many Requests</span></div>
+          <div class="http-hdr"><span>Retry-After:</span> 60</div>
+          <figcaption>Phản hồi mà LoanBud <em>nhận</em> từ HubSpot và LendingWise — và cũng là phản hồi Portal <em>trả</em> cho client vượt limit.</figcaption>
+        </figure>
+      </div>
+      <div class="notes"><p>Mở đầu: LoanBud không có rate limiter ở tầng gateway — không WAF, không nginx, không ingress rule. Mọi thứ nằm trong code, chia hai chiều: vào và ra.</p></div>
+      <div class="foot"><span>1 / 18</span><span class="mono">loanbud-hq</span></div>
+    </section>
+
+    <!-- 2 — two directions -->
+    <section class="slide" data-section="topology">
+      <div class="eyebrow">Vị trí triển khai</div>
+      <h2>Hai chiều, không có gateway</h2>
+      <div class="body" style="justify-content:center;">
+        <svg viewBox="0 0 1120 260" style="width:100%;height:auto;overflow:visible;">
+          <text x="60" y="24" class="sv-lbl-sm">Chiều vào</text>
+          <g font-family="var(--sans)">
+            <rect x="20" y="40" width="140" height="56" rx="12" class="sv-box"/><text x="90" y="73" text-anchor="middle" class="sv-lbl">Client</text>
+            <rect x="210" y="40" width="140" height="56" rx="12" class="sv-box" data-step="1" opacity="0.5"/>
+            <text x="280" y="66" text-anchor="middle" class="sv-lbl-sm" data-step="1">WAF / nginx</text>
+            <text x="280" y="82" text-anchor="middle" class="sv-hot" data-step="1">không có</text>
+            <rect x="400" y="40" width="150" height="56" rx="12" class="sv-box-hot"/><text x="475" y="66" text-anchor="middle" class="sv-lbl">Portal / io</text><text x="475" y="82" text-anchor="middle" class="sv-lbl-sm">pod</text>
+          </g>
+          <path d="M160 68 H208" class="sv-line" marker-end="url(#arrow)"/>
+          <path d="M350 68 H398" class="sv-line" marker-end="url(#arrow)"/>
+          <text x="475" y="118" text-anchor="middle" class="sv-lbl-sm">login · draft · OTP</text>
+
+          <text x="60" y="170" class="sv-lbl-sm">Chiều ra</text>
+          <g font-family="var(--sans)">
+            <rect x="20" y="186" width="150" height="56" rx="12" class="sv-box-hot"/><text x="95" y="212" text-anchor="middle" class="sv-lbl">Hub / io</text><text x="95" y="228" text-anchor="middle" class="sv-lbl-sm">pod</text>
+            <rect x="720" y="186" width="150" height="56" rx="12" class="sv-box"/><text x="795" y="212" text-anchor="middle" class="sv-lbl">LendingWise</text><text x="795" y="228" text-anchor="middle" class="sv-lbl-sm">HubSpot</text>
+          </g>
+          <path d="M170 214 H718" class="sv-line" marker-end="url(#arrow)"/>
+          <text x="445" y="204" text-anchor="middle" class="sv-lbl-sm">pacer · sweep delay</text>
+          <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 Z" class="sv-ink"/></marker></defs>
+        </svg>
+      </div>
+      <div class="notes"><p>Không thấy rule rate-limit nào ở WAF, nginx hay ingress trong infra-loanbud và terraform. Chiều vào bảo vệ hệ thống mình; chiều ra tránh bị LendingWise, HubSpot chặn.</p></div>
+      <div class="foot"><span>2 / 18</span><span class="mono">infra-loanbud, terraform</span></div>
+    </section>
+
+    <!-- 3 — token bucket -->
+    <section class="slide" data-section="token-bucket">
+      <div class="eyebrow">Token bucket · chiều ra</div>
+      <h2>Thùng 5 token, nạp 5 token mỗi giây</h2>
+      <div class="split">
+        <div class="chart">
+          <svg id="gantt"></svg>
+          <div class="legend"><span><i class="lg-dot ink"></i>gọi ngay</span><span><i class="lg-bar"></i>đang ngủ để trả nợ</span></div>
+          <figcaption>10 luồng gọi <code>acquire()</code> cùng lúc t = 0. Năm luồng đầu đi ngay; từ luồng thứ sáu, mỗi luồng lệch nhau đúng 200 ms.</figcaption>
+        </div>
+        <ul class="points">
+          <li><span class="chip hot">lazy refill</span> Không có thread nạp theo lịch — mỗi lần gọi tự tính <code>tokens = min(5, tokens + Δt × 5)</code>.</li>
+          <li><span class="chip">mượn trước</span> Hết token thì cho token xuống âm và ngủ đúng phần thiếu, thay vì chờ lần nạp kế tiếp rồi tranh nhau.</li>
+          <li><span class="chip risk">maxWait 30s</span> Chờ quá 30 giây thì ném <code>LendingWiseRateLimitException</code>, không để batch treo.</li>
+        </ul>
+      </div>
+      <div class="notes"><p>Pacer gắn vào Feign interceptor nên cả call auth và metadata cũng dùng chung thùng, vì LendingWise tính quota theo cả tenant. Hạn chế: mỗi process một thùng riêng — N pod thì tổng thực tế N×5 rps.</p></div>
+      <div class="foot"><span>3 / 18</span><span class="mono">lendingwise/pacing/LendingWiseRatePacer.java</span></div>
+    </section>
+
+    <!-- 4 — pacer code -->
+    <section class="slide" data-section="pacer-code">
+      <div class="eyebrow">Token bucket · code</div>
+      <h2>Mượn trước rồi ngủ đúng phần thiếu</h2>
+      <div class="split code-left">
+        <pre class="code">public void acquire() {
+  long waitNanos;
+  synchronized (this) {
+    refill();
+    var deficit = 1d - tokens;
+    waitNanos = deficit &lt;= 0 ? 0
+      : (long) Math.ceil(deficit / permitsPerSecond * NANOS_PER_SECOND);
+    if (waitNanos &gt; maxWaitNanos) {
+      throw new LendingWiseRateLimitException(maxWait, <span class="c">…</span>);
+    }
+    <span class="hl">tokens -= 1d;</span>  <span class="c">// mượn trước, có thể âm</span>
+  }
+  if (waitNanos &gt; 0) sleep(waitNanos);
+}</pre>
+        <ul class="points tight">
+          <li data-step="1"><b>Trừ token trước khi ngủ.</b> Luồng kế tiếp thấy thùng đã âm, tự tính ra thời gian chờ dài hơn — không có hai luồng nào tính ra cùng một mốc thức dậy.</li>
+          <li data-step="2"><b>Khối <code>synchronized</code> chỉ giữ phép tính, không giữ lúc ngủ.</b> Việc trừ token xảy ra trong lock; <code>sleep()</code> nằm ngoài, nên các luồng không khoá lẫn nhau khi chờ.</li>
+          <li data-step="3"><b>maxWait là tín hiệu duy nhất.</b> Một cửa sổ bận đúng là điều exception này diễn tả — không lặng lẽ treo cả batch.</li>
+        </ul>
+      </div>
+      <div class="notes"><p>Đây là cách acquire() giữ 10 luồng xếp hàng cách nhau 200ms thay vì cùng thức dậy ở lần nạp kế tiếp rồi tranh nhau.</p></div>
+      <div class="foot"><span>4 / 18</span><span class="mono">LendingWiseRatePacer.java:54-73</span></div>
+    </section>
+
+    <!-- 5 — leaky bucket -->
+    <section class="slide" data-section="leaky-bucket">
+      <div class="eyebrow">Leaky bucket · không có bản chuẩn</div>
+      <h2>Xả đều, không cho burst</h2>
+      <div class="split">
+        <div class="chart">
+          <svg id="leaky"></svg>
+          <figcaption>Leaky bucket lý tưởng xả đúng nhịp <code>1/k</code> giây. Sweep HubSpot xả theo mẻ vì <code>delaySeconds = sequence / jobsPerSecond</code> là phép chia nguyên.</figcaption>
+        </div>
+        <ul class="points">
+          <li>Hàng nghìn application không được enqueue cùng lúc — mỗi job có <code>delaySeconds = sequence / jobsPerSecond</code>.</li>
+          <li>JobRunr đóng vai cái thùng, xả sang HubSpot với tốc độ cố định.</li>
+          <li><span class="chip">khác token bucket</span> Token bucket trả lời "được burst bao nhiêu"; leaky bucket trả lời "xả đều với tốc độ nào". Bão hoà, token bucket cũng thành leaky bucket.</li>
+        </ul>
+      </div>
+      <div class="notes"><p>Token bucket khi luôn nợ token cũng chính là leaky bucket — đầu ra đều 200ms.</p></div>
+      <div class="foot"><span>5 / 18</span><span class="mono">HubSpotApplicationSyncWorker.sweep()</span></div>
+    </section>
+
+    <!-- 6 — fixed window -->
+    <section class="slide" data-section="fixed-window">
+      <div class="eyebrow">Fixed window counter · dùng nhiều nhất</div>
+      <h2>Cửa sổ hết hạn, đếm lại từ đầu</h2>
+      <div class="split even">
+        <div class="chart">
+          <svg id="fixed"></svg>
+          <figcaption>Caffeine <code>expireAfterWrite</code>: cửa sổ tính từ lần thử <b>đầu tiên</b> của key, không căn theo đồng hồ tường.</figcaption>
+        </div>
+        <ul class="points">
+          <li><span class="chip">giống nhau</span> Login (15 phút, 10 lần) và draft application (600 giây, 10 lần) đều dùng Caffeine đếm trong heap.</li>
+          <li><span class="chip risk">lỗi dồn ở ranh giới</span> 10 lần lúc 14:59, key hết hạn, thêm 10 lần nữa — 20 lần trong vài giây, vì hai cửa sổ không thẳng hàng theo đồng hồ.</li>
+          <li><code>incrementAndGet()</code> trên <code>AtomicInteger</code> không ghi lại entry, nên TTL không tự dời theo lần thử mới nhất.</li>
+        </ul>
+      </div>
+      <div class="notes"><p>Đây là nhược điểm kinh điển của fixed window: client gửi tối đa ở giây cuối cửa sổ này và tối đa ở giây đầu cửa sổ kế, được gấp đôi lượng cho phép trong khoảng ngắn.</p></div>
+      <div class="foot"><span>6 / 18</span><span class="mono">LoginRateLimitService.java · DraftApplicationRateLimiter.java</span></div>
+    </section>
+
+    <!-- 7 — three inbound limiters table -->
+    <section class="slide" data-section="inbound-table">
+      <div class="eyebrow">Chiều vào</div>
+      <h2>Ba limiter bảo vệ hệ thống mình</h2>
+      <div class="body" style="justify-content:center;">
+        <table class="tbl">
+          <thead><tr><th>Nơi</th><th>Cửa sổ</th><th class="num">Limit</th><th>Key</th><th>Khi vượt</th></tr></thead>
+          <tbody>
+            <tr><td class="name">Login<span>LoginRateLimitService</span></td><td>15 phút</td><td class="num">10 / cặp · 30 / IP</td><td class="mono">email + IP</td><td><span class="chip">401 INVALID_CREDENTIALS</span></td></tr>
+            <tr><td class="name">Draft application<span>DraftApplicationRateLimiter</span></td><td>600 giây</td><td class="num">10</td><td class="mono">partnerSlug:IP</td><td><span class="chip hot">429</span></td></tr>
+            <tr><td class="name">OTP<span>service-io, Redis</span></td><td>6 phút</td><td class="num">5 lần sai</td><td class="mono">email</td><td><span class="chip risk">chặn 5 phút</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="notes"><p>Cả ba đều là fixed window counter, nhưng khác nhau ở nơi lưu trạng thái: hai cái đầu trong heap Caffeine, OTP trong Redis dùng chung giữa các pod.</p></div>
+      <div class="foot"><span>7 / 18</span><span class="mono">backend-portal, service-io</span></div>
+    </section>
+
+    <!-- 8 — login trio -->
+    <section class="slide" data-section="login-trio">
+      <div class="eyebrow">Login rate limit · ba quyết định đúng</div>
+      <h2>Vì sao <code>LoginRateLimitService</code> không tự lộ điểm yếu</h2>
+      <div class="trio">
+        <div class="card lift">
+          <div class="k">Key kép</div>
+          <div class="t">email + IP<br />và IP một mình</div>
+          <p>Key không bao giờ là email đơn thuần — ai cũng có thể gõ email của borrower 10 lần để khoá người đó khỏi portal.</p>
+        </div>
+        <div class="card lift">
+          <div class="k">Phản hồi</div>
+          <div class="t">401, không phải 429</div>
+          <p>Vượt limit trả cùng lỗi với sai mật khẩu. Người gọi không dò được email nào có tài khoản.</p>
+        </div>
+        <div class="card lift">
+          <div class="k">Địa chỉ IP</div>
+          <div class="t">hop cuối X-Forwarded-For</div>
+          <p>ALB nối IP thật vào cuối header, nên chỉ hop cuối là giá trị client không thể tự gửi giả.</p>
+        </div>
+      </div>
+      <div class="notes"><p>So sánh: DraftApplicationRateLimiter lấy hop đầu tiên — có thể lách bằng header giả nếu phía trước ALB không có CloudFront chặn header client tự đặt.</p></div>
+      <div class="foot"><span>8 / 18</span><span class="mono">LoginRateLimitService.java:63-110</span></div>
+    </section>
+
+    <!-- 9 — sliding window log -->
+    <section class="slide" data-section="sliding-log">
+      <div class="eyebrow">Sliding window log · không dùng ở LoanBud</div>
+      <h2>Chính xác tuyệt đối, tốn O(N) bộ nhớ</h2>
+      <div class="split">
+        <div class="chart">
+          <svg id="swlog"></svg>
+          <figcaption>Mỗi request là một mốc thời gian. Mốc cũ hơn 15 phút bị xoá trước khi đếm mốc còn lại.</figcaption>
+        </div>
+        <ul class="points">
+          <li>Nếu làm bằng Redis: <code>ZSET</code> — <code>ZREMRANGEBYSCORE</code> xoá mốc cũ, <code>ZCARD</code> đếm, <code>ZADD</code> thêm mốc mới.</li>
+          <li>Chính xác tuyệt đối vì không có ranh giới cửa sổ nào để gian lận.</li>
+          <li>Cái giá: mỗi key giữ một danh sách mốc thời gian — bộ nhớ tỉ lệ với số request, không phải hằng số.</li>
+        </ul>
+      </div>
+      <div class="notes"><p>LoanBud chưa dùng sliding window log ở đâu — cả ba limiter chiều vào đều là fixed window.</p></div>
+      <div class="foot"><span>9 / 18</span><span class="mono">tham khảo — chưa có trong codebase</span></div>
+    </section>
+
+    <!-- 10 — sliding window counter -->
+    <section class="slide" data-section="sliding-counter">
+      <div class="eyebrow">Sliding window counter · không dùng, nhưng đáng cân nhắc</div>
+      <h2>Ước lượng bằng hai con số mỗi key</h2>
+      <div class="split">
+        <div class="stack">
+          <svg id="sw-bar" style="width:100%;height:96px;overflow:visible;"></svg>
+          <div class="legend"><span><i class="lg-dot ink"></i>cửa sổ trước, đã giảm trọng số</span><span><i class="lg-dot"></i>cửa sổ này</span></div>
+          <div class="formula" id="sw-calc">3 + 8 × (1 − 5/15) = <b>8.3</b></div>
+          <div class="verdict">Kết quả: <span class="chip ink" id="sw-verdict">Cho qua</span><span class="readout">ước lượng <b id="sw-est">8.3</b> / 10</span></div>
+        </div>
+        <div class="stack">
+          <div class="sliders">
+            <label>Đếm cửa sổ trước <output id="sw-prev-o">8</output>
+              <input id="sw-prev" type="range" min="0" max="15" value="8" /></label>
+            <label>Đếm cửa sổ này <output id="sw-curr-o">3</output>
+              <input id="sw-curr" type="range" min="0" max="15" value="3" /></label>
+            <label>Đã trôi qua cửa sổ này <output id="sw-el-o">5 phút</output>
+              <input id="sw-el" type="range" min="0" max="15" value="5" /></label>
+          </div>
+          <p class="caption">Kéo thanh trượt để thấy công thức <code>đếm_này + đếm_trước × (1 − tỉ_lệ_đã_trôi)</code> phản ứng thế nào — limit ví dụ 10 lần / 15 phút, giống login limiter.</p>
+        </div>
+      </div>
+      <div class="notes"><p>Mỗi key chỉ cần lưu 2 số. Nếu chuyển login limiter lên Redis thì đây là cách nên dùng thay vì ZSET.</p></div>
+      <div class="foot"><span>10 / 18</span><span class="mono">tham khảo — thay thế đề xuất cho LoginRateLimitService</span></div>
+    </section>
+
+    <!-- 11 — where state lives -->
+    <section class="slide" data-section="state-trio">
+      <div class="eyebrow">Trạng thái phân tán</div>
+      <h2>Đếm ở đâu quyết định limit thật là bao nhiêu</h2>
+      <div class="trio">
+        <div class="card lift">
+          <div class="k">Heap process</div>
+          <div class="t">Login · Draft</div>
+          <p>Caffeine cache riêng từng pod. N replica thì limit thật = limit cấu hình × N. Javadoc tự ghi điều này.</p>
+        </div>
+        <div class="card lift">
+          <div class="k">Redis dùng chung</div>
+          <div class="t">OTP</div>
+          <p>Các pod đếm chung một key — limit đúng như cấu hình, không nhân theo số replica.</p>
+        </div>
+        <div class="card lift">
+          <div class="k">Bộ nhớ process</div>
+          <div class="t">LendingWise pacer + gate</div>
+          <p>Cả bucket lẫn cổng đóng đều tính riêng cho từng process — chạy N pod thì tổng thực tế N × 5 rps.</p>
+        </div>
+      </div>
+      <div class="notes"><p>Vị trí triển khai chỉ có ở tầng application — request bị chặn đã đi tới pod rồi, không có gateway chặn trước.</p></div>
+      <div class="foot"><span>11 / 18</span><span class="mono">Javadoc: "effective limit is the configured value multiplied by the replica count"</span></div>
+    </section>
+
+    <!-- 12 — OTP race -->
+    <section class="slide" data-section="otp-race">
+      <div class="eyebrow">Race condition · OTP</div>
+      <h2><code>INCR</code> rồi mới <code>EXPIRE</code>, là hai lệnh riêng</h2>
+      <div class="split code-left">
+        <div class="stack">
+          <div class="code-label">Hiện tại — hai lệnh Redis riêng</div>
+          <pre class="code">override fun incrementAttempts(email: String): Long {
+  val key = RedissonKeyspace.OTP_ATTEMPTS.stamp(email)
+  val atomicLong = redissonClient.getAtomicLong(key)
+  val count = atomicLong.incrementAndGet()  <span class="c">// (1)</span>
+  if (count == 1L) {
+    <span class="hl">atomicLong.expire(Duration.ofMinutes(6))</span>  <span class="c">// (2)</span>
+  }
+  return count
+}</pre>
+        </div>
+        <ul class="points tight" data-step="1">
+          <li><b>Pod chết giữa (1) và (2):</b> key tồn tại nhưng không có TTL.</li>
+          <li>Bộ đếm của email đó tăng mãi — mỗi lần thử sau lại cộng dồn và bị chặn tiếp.</li>
+          <li><span class="chip">cách sửa</span> Gộp <code>INCR</code> + <code>EXPIRE</code> vào một Lua script để Redis chạy nguyên tử.</li>
+        </ul>
+      </div>
+      <div class="notes"><p>Đây là điểm dễ bỏ sót nhất trong toàn bộ OTP flow — chỉ lộ ra khi pod restart đúng lúc giữa hai lệnh.</p></div>
+      <div class="foot"><span>12 / 18</span><span class="mono">DefaultOtpCacheService.kt:122-131</span></div>
+    </section>
+
+    <!-- 13 — outbound 429 handling -->
+    <section class="slide" data-section="outbound-429">
+      <div class="eyebrow">Chiều ra · khi vendor trả 429</div>
+      <h2>Pacer chặn trước, gate đóng sau</h2>
+      <div class="two">
+        <div class="card lift">
+          <div class="k">HubSpot</div>
+          <div class="t">Đọc Retry-After, enqueue lại</div>
+          <p>Đọc header <code>Retry-After</code> (số giây hoặc HTTP-date), giới hạn trong một khoảng, mặc định 60s, rồi enqueue lại đúng job đó với delay đó.</p>
+        </div>
+        <div class="card lift">
+          <div class="k">LendingWise</div>
+          <div class="t"><code>LendingWiseRateLimitGate</code></div>
+          <p>Một call bị 429 là đóng cổng cho <b>mọi</b> call trong process, trong <code>[30s, 60s]</code> — không để từng thread tự dò limit bằng cách lần lượt bị từ chối.</p>
+        </div>
+      </div>
+      <div class="body" style="flex:0;" data-step="1">
+        <div class="legend"><span><i class="lg-bar"></i>pacer đang xả đều 200ms</span><span><i class="lg-dot hot" style="background:var(--primary)"></i>429 → gate đóng [30s–60s]</span></div>
+      </div>
+      <div class="notes"><p>Gate phản ứng sau khi đã bị 429, pacer chặn trước để không bị 429 — hai cái bổ sung cho nhau, không thay thế nhau.</p></div>
+      <div class="foot"><span>13 / 18</span><span class="mono">LendingWiseRateLimitGate.java · HubSpotApplicationSyncWorker.java:92-99</span></div>
+    </section>
+
+    <!-- 14 — backoff table -->
+    <section class="slide" data-section="backoff-table">
+      <div class="eyebrow">Backoff đang chạy song song</div>
+      <h2>Ba kiểu backoff, chỉ một có jitter</h2>
+      <div class="body" style="justify-content:center;">
+        <table class="tbl">
+          <thead><tr><th>Nơi</th><th>Công thức</th><th>Jitter</th></tr></thead>
+          <tbody>
+            <tr><td class="name">CRM outbox<span>tính trong SQL</span></td><td class="mono">min(30 · 2ⁿ⁻¹, 600) giây</td><td><span class="chip risk">không có</span></td></tr>
+            <tr><td class="name">OCR identify<span>service-io</span></td><td class="mono">10s → 60s → 300s</td><td><span class="chip risk">không có</span></td></tr>
+            <tr><td class="name">RetryJobExponentialBackoffStrategy<span>service-crm</span></td><td class="mono">Random(base/2, base+1)</td><td><span class="chip ink">equal jitter</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="notes"><p>Hai chỗ chưa có jitter là ứng viên tốt nhất để thêm — thundering herd thật sự xảy ra ở đó khi vendor sập rồi hồi lại.</p></div>
+      <div class="foot"><span>14 / 18</span><span class="mono">RetryJobExponentialBackoffStrategy.kt:36-38</span></div>
+    </section>
+
+    <!-- 15 — thundering herd -->
+    <section class="slide" data-section="herd">
+      <div class="eyebrow">Vì sao cần jitter</div>
+      <h2>1.000 client, không jitter, cùng thức dậy</h2>
+      <div class="body">
+        <div class="seg" id="herd-seg" role="group" aria-label="Chế độ backoff">
+          <button data-mode="none" aria-pressed="true">Không jitter</button>
+          <button data-mode="equal">Equal jitter</button>
+          <button data-mode="full">Full jitter</button>
+        </div>
+        <div class="chart">
+          <svg id="herd"></svg>
+          <figcaption>HubSpot sập 2 phút, 1.000 row outbox fail cùng lúc, backoff <code>30s → 90s → 210s</code>. Mỗi ô là 5 giây.</figcaption>
+        </div>
+        <p class="readout" id="herd-readout"></p>
+      </div>
+      <div class="notes"><p>Exponential chỉ giãn khoảng cách giữa các đợt, không làm các client lệch nhau — jitter mới làm việc đó. Full jitter cho tổng tải thấp nhất; equal jitter luôn chờ ít nhất t/2.</p></div>
+      <div class="foot"><span>15 / 18</span><span class="mono">mô phỏng — theo AWS "Exponential Backoff and Jitter"</span></div>
+    </section>
+
+    <!-- 16 — three jitter formulas -->
+    <section class="slide" data-section="jitter-formulas">
+      <div class="eyebrow">Ba công thức jitter</div>
+      <h2>service-crm dùng equal jitter</h2>
+      <div class="split even">
+        <table class="tbl">
+          <thead><tr><th>Kiểu</th><th>Thời gian chờ</th></tr></thead>
+          <tbody>
+            <tr><td class="name">Full jitter</td><td class="mono">random(0, min(cap, base·2ⁿ))</td></tr>
+            <tr><td class="name">Equal jitter</td><td class="mono">t/2 + random(0, t/2)</td></tr>
+            <tr><td class="name">Decorrelated</td><td class="mono">min(cap, random(base, prev·3))</td></tr>
+          </tbody>
+        </table>
+        <div class="stack">
+          <pre class="code">val base = (job.delay?.let { it * backoffMultiplier }
+  ?: initDelay).coerceAtMost(maxDelay)
+<span class="hl">return Random.nextLong(base / 2, base + 1)</span></pre>
+          <p class="lead" style="font-size:17px;" data-step="1"><b>Lưu ý:</b> <code>job.delay</code> lưu giá trị đã jitter, nên base lần sau = delay đã jitter × 2. Trung bình mỗi lần chỉ tăng khoảng <b>1.5×</b>, không phải 2×.</p>
+        </div>
+      </div>
+      <div class="notes"><p>Full jitter cho tổng tải thấp nhất theo bài AWS. Decorrelated không cần biết đang ở lần retry thứ mấy — chỉ cần lần chờ trước.</p></div>
+      <div class="foot"><span>16 / 18</span><span class="mono">RetryJobExponentialBackoffStrategy.kt</span></div>
+    </section>
+
+    <!-- 17 — Retry-After still needs jitter -->
+    <section class="slide" data-section="retry-after">
+      <div class="eyebrow">Có Retry-After vẫn cần jitter</div>
+      <h2>Server bảo "chờ 60s" — mọi client thức dậy đúng giây 60</h2>
+      <div class="body">
+        <div class="seg" id="ra-seg" role="group" aria-label="Có jitter hay không">
+          <button data-mode="exact" aria-pressed="true">retryAfterSeconds đúng</button>
+          <button data-mode="jitter">+ random(0, 20%)</button>
+        </div>
+        <div class="chart">
+          <svg id="ra"></svg>
+          <figcaption>400 job HubSpot bị 429 cùng lúc, tất cả nhận <code>Retry-After: 60</code>.</figcaption>
+        </div>
+        <p class="readout" id="ra-readout"></p>
+      </div>
+      <div class="notes"><p>Cách sửa rẻ nhất cho đường HubSpot: retryAfter + random(0, 20% × retryAfter). LendingWise không bị vấn đề này vì khi cổng mở lại, pacer vẫn xả đều 200ms.</p></div>
+      <div class="foot"><span>17 / 18</span><span class="mono">HubSpotApplicationSyncWorker.java:92-99</span></div>
+    </section>
+
+    <!-- 18 — takeaways -->
+    <section class="slide" data-section="takeaways">
+      <div class="eyebrow">Rút ra</div>
+      <h2>Năm việc đáng làm tiếp</h2>
+      <ul class="points">
+        <li><span class="chip risk">bug</span> Gộp <code>INCR</code> + <code>EXPIRE</code> của OTP vào một Lua script — hiện tại không nguyên tử.</li>
+        <li><span class="chip risk">bug</span> <code>DraftApplicationRateLimiter</code> lấy IP đầu tiên trong X-Forwarded-For — client tự gửi giả được. Kiểm tra có CloudFront trước ALB rồi đổi sang lấy hop cuối như <code>LoginRateLimitService</code>.</li>
+        <li><span class="chip">cải thiện</span> Thêm jitter cho CRM outbox và OCR identify — hai chỗ duy nhất chưa có.</li>
+        <li><span class="chip">cải thiện</span> Thêm <code>random(0, 20%)</code> vào delay enqueue-lại của HubSpot sau 429, dù đã có Retry-After.</li>
+        <li><span class="chip">cân nhắc</span> Nếu chuyển login/OTP limiter lên Redis dùng chung nhiều pod, sliding window counter tốn ít bộ nhớ hơn ZSET.</li>
+      </ul>
+      <div class="notes"><p>Không nằm trong phạm vi câu hỏi ban đầu nhưng đáng ghi lại: hai lỗi cụ thể tìm thấy khi đọc code, và ba việc nên làm để chắc tay hơn.</p></div>
+      <div class="foot"><span>18 / 18</span><span class="mono">loanbud-hq</span></div>
+    </section>
+
+  </div>
+</div>
+
+<div class="progress"><i></i></div>
+<div class="pager"></div>
+<div class="notes-panel" hidden></div>
+
+<script src="widgets.js" defer></script>
+<script src="deck.js" defer></script>
+</body>
+</html>
