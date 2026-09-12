@@ -34,7 +34,7 @@ and card, doing double duty as illustration.
 - **Shape**: chips and segmented-control buttons are full pills (`100px`); cards, the slide frame,
   and the gauge card use a `24px` radius with a visible accent-tinted border; inputs and code
   blocks stay at `12px`.
-- **Signature move — section dividers**: five divider slides (one per act) carry a numeral in
+- **Signature move — section dividers**: eight divider slides (one per act) carry a numeral in
   large outline type (`-webkit-text-stroke`, transparent fill) in teal, with a dash-and-label
   "SECTION n" tag directly beneath it, then the act's title and one-line thesis.
 - **Layout**: same reusable layouts as before (split 60/40, trio, table, full), but every diagram
@@ -68,36 +68,57 @@ per-tab bucket, reproducing the "in-process memory ⇒ limit × replica count" p
 shared bucket's read-modify-write is intentionally non-atomic across tabs — the same race the
 lecture warns about — rather than papered over with a lock the real bug doesn't have.
 
+## Content source
+
+Restructured to follow [`PRESENTATION-EN.md`](PRESENTATION-EN.md) — an English adaptation of
+[spartan-nhanta/vntech-rate-limit](https://github.com/spartan-nhanta/vntech-rate-limit)'s
+`presentation/rate-limit-outline.md` ("The Physics of Traffic Control," a 100-minute two-presenter
+internal talk). That file is the outline to read first; this deck is its self-paced, single-track
+rendering. Existing slides (the five algorithms, the backoff/jitter interactives, `demo.html`)
+carried over unchanged where the outline's content matched what was already here; everything in
+sections 1, 2, 3, 5, and 7 below is new.
+
 ## Slide list
 
-Five acts, each opened by a divider slide (bold row below); a hands-on demo slide sits near the end.
+Eight acts, each opened by a divider slide (bold row below): Introduction, Implementation Layers,
+Distributed State, Algorithms, System Design, Demo, Checkpoint Questions, and a closing Takeaways.
 
-| # | Title | Layout | Visual | Steps |
-|---|---|---|---|---|
-| 1 | Rate Limiting | cover | Gauge dial hero, needle in the accent zone | — |
-| **2** | **§01 — Where it lives** | **divider** | **Outline "01"** | — |
-| 3 | Two places a limiter can live | full | Client → gateway → service, service → third party | 1: "gateway: often absent" |
-| **4** | **§02 — Counting algorithms** | **divider** | **Outline "02"** | — |
-| 5 | Token bucket: burst, then a steady drip | split | Gantt of 10 concurrent callers against a 5-token bucket | 1: callers 6–10 |
-| 6 | Borrow first, then sleep off the debt | split | Pseudocode `acquire()` | 1–3 |
-| 7 | Leaky bucket: smooth the output, not the input | split | Ideal drip vs. batched drip (integer division) | 1 |
-| 8 | Fixed window: the boundary spike | split | Two windows meeting at a clock boundary | 1, 2 |
-| 9 | Fixed window in the wild | table | Three common uses | — |
-| 10 | Picking the right key | trio | Composite key, status-code parity, trusted hop | — |
-| 11 | Sliding window log | split | Timestamps trimmed against a ZSET | — |
-| 12 | Sliding window counter | split | Interactive slider on the estimate formula | — |
-| **13** | **§03 — State & correctness** | **divider** | **Outline "03"** | — |
-| 14 | Where the counter lives changes the limit | trio | In-process / shared cache / vendor-side | — |
-| 15 | Two commands, one race | split | `INCR` then `EXPIRE`, and the atomic fix | 1 |
-| **16** | **§04 — Being a good client** | **divider** | **Outline "04"** | — |
-| 17 | Absorbing a 429 | two-up | Retry-After backpressure vs. a shared circuit gate | 1 |
-| 18 | Three backoff schedules, one has jitter | table | Comparison | — |
-| 19 | Why jitter: the thundering herd | full | Histogram, mode switch (none/equal/full) | — |
-| 20 | Three jitter formulas | split | Table + pseudocode | 1 |
-| 21 | Retry-After still needs jitter | full | Histogram, exact vs. +20% | — |
-| 22 | Open it in four tabs and get throttled | split | Link out to `demo.html` | — |
-| **23** | **§05 — Takeaways** | **divider** | **Outline "05"** | — |
-| 24 | Takeaways | list | Five points | — |
+| # | Title | Layout | Visual |
+|---|---|---|---|
+| 1 | Rate Limiting | cover | Gauge dial hero |
+| **2** | **§1 — Introduction** | divider | Outline "01" |
+| 3 | Rate limiting vs. throttling vs. load shedding | table | Three-concept comparison |
+| 4 | Status codes & headers | code | `429`/`503`/`403` + `Retry-After` etc. |
+| **5** | **§2 — Implementation layers** | divider | Outline "02" |
+| 6 | Client, infrastructure, application | full | Live Archify topology diagram |
+| 7 | Client-side: debounce, batch, backoff | trio | Three code snippets |
+| 8–10 | Thundering herd · jitter formulas · Retry-After jitter | full/split | Interactive histograms (reused) |
+| 11 | Nginx: event-driven I/O | split | Event-loop explanation |
+| 12 | Nginx config + load balancing | code | `limit_req_zone`, Kong/Envoy |
+| 13 | Application/middleware | code | Kotlin tier-based filter |
+| **14** | **§3 — Distributed state** | divider | Outline "03" |
+| 15 | Multi-pod counter problem | diagram | Load balancer fanning to 3 pods |
+| 16 | Two commands, one race | split | `INCR`+`EXPIRE` race, Lua fix (reused) |
+| 17 | Hash tags & Redis Cluster | code | `CROSSSLOT` vs. `{}` |
+| 18 | Precision vs. performance | table | Lua / local cache / approximate |
+| **19** | **§4 — Algorithms** | divider | Outline "04" |
+| 20–27 | Token bucket ×2, leaky bucket, fixed window ×2, key design, sliding log, sliding counter | split/table/trio | Reused from the original deck |
+| 28 | GCRA | code | `tat` pseudocode |
+| 29 | Six algorithms, compared | table | Full comparison incl. GCRA |
+| **30** | **§5 — System design** | divider | Outline "05" |
+| 31 | Requirements | trio | Big-number stat tiles |
+| 32 | Architecture | diagram | Clients → edge → app → Redis Cluster |
+| 33 | Sharding | code | Per-user key vs. sharded global key |
+| 34 | Hard limit vs. soft limit | two-up | Comparison + code |
+| 35 | Fail-open vs. fail-closed | two-up | Comparison |
+| 36 | Absorbing a 429 | two-up | Retry-After + circuit gate (reused) |
+| 37 | Backoff schedules | table | Comparison (reused) |
+| **38** | **§6 — Demo** | divider | Outline "06" |
+| 39 | Open it in four tabs and get throttled | split | Link to `demo.html` |
+| **40** | **§7 — Checkpoint questions** | divider | Outline "07" |
+| 41 | Easy, medium, hard | list | Three Q&A |
+| **42** | **Takeaways** | divider | Outline "08" |
+| 43 | Five things worth remembering | list | Closing points (reused) |
 
 ## Keyboard
 
@@ -106,7 +127,6 @@ Five acts, each opened by a divider slide (bold row below); a hands-on demo slid
 
 ## Deploying to GitHub Pages
 
-No build step. Push this folder to a repo, then in **Settings → Pages** choose
-**Deploy from a branch**, branch `main`, folder `/ (root)` — or `/docs` if you'd rather nest it.
-`.nojekyll` is included so GitHub doesn't run the Jekyll build over the `deck.js`/`widgets.js`
-files.
+Automatic via [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) on every push to
+`main` — see [`README.md`](README.md) for details. No build step; `.nojekyll` stops GitHub from
+running the site through Jekyll.

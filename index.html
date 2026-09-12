@@ -390,6 +390,7 @@ body.overview .progress, body.overview .pager { display: none; }
 </head>
 <body>
 
+
 <svg class="icons" aria-hidden="true">
   <symbol id="ic-gate" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
     <path d="M3 20V6l9-3 9 3v14" /><path d="M3 20h18" /><path d="M9 20v-7h6v7" /></symbol>
@@ -418,18 +419,29 @@ body.overview .progress, body.overview .pager { display: none; }
   <symbol id="ic-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
     <path d="M9 6h11M9 12h11M9 18h11" /><circle cx="4.5" cy="6" r="1.3" fill="currentColor" stroke="none" />
     <circle cx="4.5" cy="12" r="1.3" fill="currentColor" stroke="none" /><circle cx="4.5" cy="18" r="1.3" fill="currentColor" stroke="none" /></symbol>
+  <symbol id="ic-server" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="4" y="4" width="16" height="6" rx="1.5" /><rect x="4" y="14" width="16" height="6" rx="1.5" />
+    <circle cx="7.2" cy="7" r="0.9" fill="currentColor" stroke="none" /><circle cx="7.2" cy="17" r="0.9" fill="currentColor" stroke="none" /></symbol>
+  <symbol id="ic-scale" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 3v17" /><path d="M12 20h5M12 20H7" /><path d="M5 7h14" />
+    <path d="M5 7 2 13a3 3 0 0 0 6 0Z" /><path d="M19 7l-3 6a3 3 0 0 0 6 0Z" /></symbol>
+  <symbol id="ic-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 3.2 19 6v6c0 5-3.2 7.8-7 8.8-3.8-1-7-3.8-7-8.8V6Z" /></symbol>
+  <symbol id="ic-question" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="9" /><path d="M9.3 9.2a2.7 2.7 0 0 1 5.2.9c0 1.6-1.1 2.1-2.1 3-.6.5-.9 1-.9 1.8" />
+    <circle cx="12" cy="17.2" r="0.6" fill="currentColor" stroke="none" /></symbol>
 </svg>
 
 <div class="stage">
   <div class="deck" id="deck">
 
-    <!-- 1 — cover -->
+    <!-- 0 — cover -->
     <section class="slide" data-section="cover">
       <div class="cover-grid">
         <div class="stack">
-          <div class="eyebrow"><svg class="ic"><use href="#ic-gauge"/></svg>A systems lecture</div>
+          <div class="eyebrow"><svg class="ic"><use href="#ic-gauge"/></svg>The physics of traffic control</div>
           <h1 class="display">Rate<br />Limiting</h1>
-          <p class="lead">Five ways to count requests, where each one belongs in an architecture, and why the retry that follows a 429 needs a little randomness to survive.</p>
+          <p class="lead">How to keep a normal client, a buggy one, and an attacker from looking identical to a server that has no limiter in front of it.</p>
         </div>
         <figure class="gauge-card">
           <svg viewBox="0 0 220 150" style="width:100%;max-width:260px;">
@@ -444,25 +456,76 @@ body.overview .progress, body.overview .pager { display: none; }
           <figcaption>The needle sits in the teal band the moment a caller is asked to slow down.</figcaption>
         </figure>
       </div>
-      <div class="notes"><p>Open with the two places a limiter matters: protecting your own system from callers, and behaving as a well-mannered client of someone else's API. Everything in this deck maps to one of those two roles.</p></div>
-      <div class="foot"><span>1 / 24</span><span>rate-limiting.dev</span></div>
+      <div class="notes"><p>Adapted from spartan-nhanta/vntech-rate-limit's internal talk outline. Seven sections: introduction, implementation layers, distributed state, algorithms, system design, a hands-on demo, and checkpoint questions.</p></div>
+      <div class="foot"><span>1 / 43</span><span>rate-limiting.dev</span></div>
     </section>
 
-    <!-- 2 — two directions -->
-    
-    <!-- divider 01 -->
+    <!-- ============ SECTION 1 — INTRODUCTION ============ -->
     <section class="slide divider" data-section="divider-01">
       <div class="divider-num">01</div>
       <div class="section-tag"><i></i>SECTION 1</div>
-      <h2>Where it lives</h2>
-      <p class="lead">Two places a rate limiter can sit, and what each one is defending.</p>
-      <div class="notes"><p>This divider marks the shift from framing to mechanism — the next slide is the only architecture slide in the deck.</p></div>
-      <div class="foot"><span>2 / 24</span><span>act i · topology</span></div>
+      <h2>Introduction</h2>
+      <p class="lead">What rate limiting is, the two concepts people conflate with it, and how a client is told to back off.</p>
+      <div class="notes"><p>Set up the vocabulary before any mechanism — this is the section that keeps "throttling" and "rate limiting" from being used as synonyms for the rest of the deck.</p></div>
+      <div class="foot"><span>2 / 43</span><span>act i · introduction</span></div>
+    </section>
+
+    <section class="slide" data-section="three-concepts">
+      <div class="eyebrow"><svg class="ic"><use href="#ic-gauge"/></svg>Three concepts, one confusion</div>
+      <h2>Rate limiting, throttling, and load shedding aren't the same thing</h2>
+      <div class="body meter" style="justify-content:center;">
+        <table class="tbl">
+          <thead><tr><th>Concept</th><th>Behavior once past the threshold</th><th>Where it actually lives</th></tr></thead>
+          <tbody>
+            <tr><td class="name">Rate limiting</td><td>Reject immediately — <code>429</code></td><td>HTTP API servers</td></tr>
+            <tr><td class="name">Throttling</td><td>Delay — hold the item, process it later</td><td>Async workers, queue consumers</td></tr>
+            <tr><td class="name">Load shedding</td><td>Reject selectively when the whole system is overloaded</td><td>Circuit breakers, infrastructure</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <ul class="points tight" data-step="1">
+        <li>AWS, Stripe, and GitHub all call their <code>429</code> behavior "rate limiting" even though, strictly, it's a reject — not a delay. In plain HTTP APIs the two words get used interchangeably.</li>
+        <li><b>Real throttling</b> shows up in async systems: a worker pulling off a Kafka topic paces itself against a shared limiter before pushing to a downstream SMS gateway — it <i>sleeps</i>, it doesn't reject, and there's no HTTP client waiting on the other end.</li>
+      </ul>
+      <div class="notes"><p>Get this distinction settled early — every later slide about client behavior (backoff, retry, circuit gates) depends on knowing whether the caller is being rejected or merely delayed.</p></div>
+      <div class="foot"><span>3 / 43</span><span>rate limiting vs. throttling vs. load shedding</span></div>
+    </section>
+
+    <section class="slide" data-section="status-codes">
+      <div class="eyebrow"><svg class="ic"><use href="#ic-log"/></svg>The vocabulary in HTTP</div>
+      <h2>Three status codes that get confused</h2>
+      <div class="split code-left">
+        <pre class="code"><span class="hl">429</span> Too Many Requests   <span class="c">// rate limit — client sent too much</span>
+<span class="hl">503</span> Service Unavailable <span class="c">// load shedding — server is overloaded</span>
+<span class="hl">403</span> Forbidden           <span class="c">// authorization — NOT rate limiting</span>
+
+Retry-After: 30                <span class="c">// seconds to wait</span>
+X-RateLimit-Limit: 100         <span class="c">// the configured limit</span>
+X-RateLimit-Remaining: 0       <span class="c">// how much is left</span>
+X-RateLimit-Reset: 1704067320  <span class="c">// epoch time of the next reset</span></pre>
+        <ul class="points tight">
+          <li><b>429</b> is the caller's fault — they can fix it by slowing down.</li>
+          <li><b>503</b> is the server's problem — retrying won't necessarily help until it recovers.</li>
+          <li><b>403</b> means "no," permanently, regardless of rate — retrying is never the fix.</li>
+        </ul>
+      </div>
+      <div class="notes"><p>A surprising number of production incidents come from a client retrying a 403 as if it were a 429 — reading the code, not just the fact that something failed, matters.</p></div>
+      <div class="foot"><span>4 / 43</span><span>status codes &amp; headers</span></div>
+    </section>
+
+    <!-- ============ SECTION 2 — IMPLEMENTATION LAYERS ============ -->
+    <section class="slide divider" data-section="divider-02">
+      <div class="divider-num">02</div>
+      <div class="section-tag"><i></i>SECTION 2</div>
+      <h2>Implementation layers</h2>
+      <p class="lead">Rate limiting isn't one place — it belongs at several layers at once, each stopping a different class of problem.</p>
+      <div class="notes"><p>Client-side (don't send the waste), infrastructure (stop it before application code), application (the only layer with business context).</p></div>
+      <div class="foot"><span>5 / 43</span><span>act ii · implementation layers</span></div>
     </section>
 
     <section class="slide" data-section="topology">
-      <div class="eyebrow"><svg class="ic"><use href="#ic-gate"/></svg>Where it lives</div>
-      <h2>A limiter can sit in two different places</h2>
+      <div class="eyebrow"><svg class="ic"><use href="#ic-gate"/></svg>Three layers, one request</div>
+      <h2>Client, infrastructure, application — each catches something different</h2>
       <div class="body" style="min-height:0;">
         <div class="diagram-embed">
           <iframe src="diagrams/request-topology.html" loading="lazy" title="Interactive: two directions through a rate limiter"></iframe>
@@ -472,24 +535,286 @@ body.overview .progress, body.overview .pager { display: none; }
           <a href="diagrams/request-topology.html" target="_blank" rel="noopener">Open full screen ↗</a>
         </div>
       </div>
-      <div class="notes"><p>A dedicated gateway (Kong, Envoy, an API-manager tier) is the tidiest place to enforce inbound limits, but plenty of real systems skip it and enforce entirely in application code instead — which is where most of this deck lives.</p></div>
-      <div class="foot"><span>3 / 24</span><span>architecture</span></div>
+      <div class="notes"><p>A dedicated gateway (Kong, Envoy, an API-manager tier) is the tidiest place to enforce inbound limits, but plenty of real systems skip it and enforce entirely in application code instead.</p></div>
+      <div class="foot"><span>6 / 43</span><span>architecture</span></div>
     </section>
 
-    <!-- 3 — token bucket -->
-    
-    <!-- divider 02 -->
-    <section class="slide divider" data-section="divider-02">
-      <div class="divider-num">02</div>
-      <div class="section-tag"><i></i>SECTION 2</div>
-      <h2>Counting algorithms</h2>
-      <p class="lead">Five ways to decide whether a request gets through, from the burst-friendly to the perfectly accurate.</p>
-      <div class="notes"><p>The longest section: token bucket, leaky bucket, fixed window, sliding log, sliding counter — in that order, cheapest first.</p></div>
-      <div class="foot"><span>4 / 24</span><span>act ii · algorithms</span></div>
+    <section class="slide" data-section="client-side">
+      <div class="eyebrow"><svg class="ic"><use href="#ic-clock"/></svg>2.1 · Client-side</div>
+      <h2>Don't send the wasted request in the first place</h2>
+      <div class="trio">
+        <div class="card lift">
+          <svg class="ic"><use href="#ic-clock"/></svg>
+          <div class="k">Debounce</div>
+          <div class="t">Collapse rapid-fire input</div>
+          <pre class="code">// typing "rate" fires 4 keystrokes
+const search = debounce(q =&gt;
+  api.search(q), 300)
+// only the last one, after 300ms
+// of silence, calls the API</pre>
+        </div>
+        <div class="card lift">
+          <svg class="ic"><use href="#ic-log"/></svg>
+          <div class="k">Batching</div>
+          <div class="t">Flush on an interval, not per event</div>
+          <pre class="code">const queue = []
+setInterval(() =&gt; {
+  if (queue.length) {
+    api.batchTrack(queue) // 1 call
+    queue.length = 0      // not N
+  }
+}, 2000)</pre>
+        </div>
+        <div class="card lift">
+          <svg class="ic"><use href="#ic-die"/></svg>
+          <div class="k">Backoff + full jitter</div>
+          <div class="t">On a 429, don't retry on the beat</div>
+          <pre class="code">const wait = Math.random() *
+  Math.min(cap, base * 2 ** i)
+await sleep(wait)
+// next 3 slides: why</pre>
+        </div>
+      </div>
+      <div class="notes"><p>None of these three protect the server directly — they exist so the client never sends the request that would have needed protecting against in the first place.</p></div>
+      <div class="foot"><span>7 / 43</span><span>client-side · debounce, batch, backoff</span></div>
+    </section>
+
+    <section class="slide" data-section="herd">
+      <div class="eyebrow"><svg class="ic"><use href="#ic-die"/></svg>Why jitter matters</div>
+      <h2>1,000 clients, no jitter, waking in unison</h2>
+      <div class="body">
+        <div class="seg" id="herd-seg" role="group" aria-label="Backoff mode">
+          <button data-mode="none" aria-pressed="true">No jitter</button>
+          <button data-mode="equal">Equal jitter</button>
+          <button data-mode="full">Full jitter</button>
+        </div>
+        <div class="chart meter">
+          <svg id="herd"></svg>
+          <figcaption>A downstream API drops for two minutes; 1,000 queued jobs fail together and retry on <code>30s → 90s → 210s</code>. Each bin is 5 seconds.</figcaption>
+        </div>
+        <p class="readout" id="herd-readout"></p>
+      </div>
+      <div class="notes"><p>Exponential backoff only spaces the retries further apart over time — it never makes concurrent clients diverge from each other. Jitter is the only ingredient that does that. Full jitter produces the lowest total load; equal jitter guarantees at least half the base delay.</p></div>
+      <div class="foot"><span>8 / 43</span><span>jitter · simulated, per AWS's "Exponential Backoff and Jitter"</span></div>
+    </section>
+
+    <section class="slide" data-section="jitter-formulas">
+      <div class="eyebrow"><svg class="ic"><use href="#ic-die"/></svg>Three jitter formulas</div>
+      <h2>Equal jitter is the common middle ground</h2>
+      <div class="split even">
+        <table class="tbl">
+          <thead><tr><th>Style</th><th>Wait time</th></tr></thead>
+          <tbody>
+            <tr><td class="name">Full jitter</td><td class="mono">random(0, min(cap, base·2ⁿ))</td></tr>
+            <tr><td class="name">Equal jitter</td><td class="mono">t/2 + random(0, t/2)</td></tr>
+            <tr><td class="name">Decorrelated</td><td class="mono">min(cap, random(base, prev·3))</td></tr>
+          </tbody>
+        </table>
+        <div class="stack">
+          <pre class="code">base = min(previousDelay * multiplier, maxDelay)
+<span class="hl">return random(base / 2, base + 1)</span></pre>
+          <p class="lead" style="font-size:16.5px;" data-step="1"><b>One catch:</b> if the next attempt's base is computed from the previous <em>jittered</em> delay rather than the original, each retry only grows by roughly <b>1.5×</b> on average, not the intended 2×.</p>
+        </div>
+      </div>
+      <div class="notes"><p>Full jitter produces the lowest aggregate load, per AWS's own writeup. Decorrelated jitter is attractive because it needs no retry counter at all — only the previous wait.</p></div>
+      <div class="foot"><span>9 / 43</span><span>jitter formulas</span></div>
+    </section>
+
+    <section class="slide" data-section="retry-after">
+      <div class="eyebrow"><svg class="ic"><use href="#ic-die"/></svg>Retry-After still needs jitter</div>
+      <h2>"Wait 60 seconds" — and everyone wakes at second 60</h2>
+      <div class="body">
+        <div class="seg" id="ra-seg" role="group" aria-label="With or without jitter">
+          <button data-mode="exact" aria-pressed="true">Retry-After, exact</button>
+          <button data-mode="jitter">+ random(0, 20%)</button>
+        </div>
+        <div class="chart meter">
+          <svg id="ra"></svg>
+          <figcaption>400 jobs are rejected at once, every one of them handed the same <code>Retry-After: 60</code>.</figcaption>
+        </div>
+        <p class="readout" id="ra-readout"></p>
+      </div>
+      <div class="notes"><p>The header tells every caller the same number, so obeying it literally recreates the herd it was meant to prevent. Adding a small jitter on top — retryAfter + random(0, 20%) — is the cheapest fix.</p></div>
+      <div class="foot"><span>10 / 43</span><span>Retry-After · jitter</span></div>
+    </section>
+
+    <section class="slide" data-section="nginx-eventloop">
+      <div class="eyebrow"><svg class="ic"><use href="#ic-server"/></svg>2.2 · Infrastructure</div>
+      <h2>One thread, ten thousand connections</h2>
+      <div class="split">
+        <div class="stack">
+          <p class="lead" style="font-size:19px;">Nginx isn't just a web server — it's a <b>reverse proxy</b> standing in front of the whole system, and this is the layer that stops a request before it ever reaches application code.</p>
+          <p style="color:var(--body); font-size:16.5px; line-height:1.55;">Most traditional web servers use <b>thread-per-connection</b>: 10,000 connections means 10,000 threads — expensive in memory, slow to context-switch.</p>
+        </div>
+        <div class="card lift">
+          <svg class="ic"><use href="#ic-server"/></svg>
+          <div class="k">Event-driven, non-blocking I/O</div>
+          <div class="t">One worker, thousands of connections</div>
+          <p>A single event loop thread reacts to <code>data ready</code>, <code>response ready</code>, <code>new connection</code>, <code>timeout</code> — while waiting on network I/O, the worker does other work instead of blocking on it. The same idea as Node.js's event loop, in C, and faster.</p>
+        </div>
+      </div>
+      <div class="notes"><p>This is why Nginx can front 10K concurrent connections on a single core — it isn't magic, it's just never blocking a thread on I/O it could be doing something else during.</p></div>
+      <div class="foot"><span>11 / 43</span><span>nginx · event loop</span></div>
+    </section>
+
+    <section class="slide" data-section="nginx-config">
+      <div class="eyebrow"><svg class="ic"><use href="#ic-pipe"/></svg>2.2 · Infrastructure</div>
+      <h2>Nginx enforces rate limits as a leaky bucket</h2>
+      <div class="split code-left">
+        <pre class="code"><span class="c"># declare a zone: by IP, 10MB, 10 req/s</span>
+limit_req_zone $binary_remote_addr
+  zone=api:10m rate=10r/s;
+
+server {
+  location /api/ {
+    <span class="hl">limit_req zone=api burst=20 nodelay;</span>
+    <span class="c"># burst=20 : queue up to 20 requests over rate
+# nodelay  : reject past that, no delay</span>
+    proxy_pass http://backend;
+  }
+}</pre>
+        <ul class="points tight">
+          <li><code>burst</code> <b>is</b> the leaky bucket's queue size — this directive is a leaky bucket by another name.</li>
+          <li><span class="chip">load balancing</span> round robin (default), <code>least_conn</code>, <code>ip_hash</code> (sticky sessions), or <code>weight=N</code> sit right alongside it in the same upstream block.</li>
+          <li><span class="chip">Kong / Envoy</span> centralize the same idea as a plugin/config shared across every gateway node — no per-service code to write.</li>
+        </ul>
+      </div>
+      <div class="notes"><p>Infrastructure-layer limiting is coarse — it only knows the IP, never the user or their subscription tier. That gap is exactly what the application layer fills next.</p></div>
+      <div class="foot"><span>12 / 43</span><span>nginx · config &amp; load balancing</span></div>
+    </section>
+
+    <section class="slide" data-section="app-middleware">
+      <div class="eyebrow"><svg class="ic"><use href="#ic-key"/></svg>2.3 · Application / middleware</div>
+      <h2>Where business context lives that infrastructure can't see</h2>
+      <div class="split code-left">
+        <pre class="code">val tier = userService.getTier(userId)
+<span class="c">// free / pro / enterprise</span>
+
+val limit = when (tier) {
+  "enterprise" -&gt; 10_000
+  "pro"        -&gt; 1_000
+  else         -&gt; <span class="hl">100</span>      <span class="c">// free</span>
+}
+
+val result = rateLimiter.check(
+  key = "$userId:$endpoint", limit = limit)</pre>
+        <ul class="points tight">
+          <li><b>Tier-based limits</b> — a VIP or paying customer gets a materially higher budget than a free account.</li>
+          <li><b>Per-endpoint limits</b> — a slow <code>/export</code> gets its own, tighter budget than a cheap read.</li>
+          <li><b>Per-API-key, not per-IP</b> — many users legitimately share one office IP; a key identifies the actual caller.</li>
+        </ul>
+      </div>
+      <div class="notes"><p>Infrastructure rate limiting is thick and coarse; application-layer limiting is where product decisions — who gets more, what costs more — actually get enforced.</p></div>
+      <div class="foot"><span>13 / 43</span><span>application layer · business logic</span></div>
+    </section>
+
+    <!-- ============ SECTION 3 — DISTRIBUTED STATE ============ -->
+    <section class="slide divider" data-section="divider-03">
+      <div class="divider-num">03</div>
+      <div class="section-tag"><i></i>SECTION 3</div>
+      <h2>Distributed state</h2>
+      <p class="lead">Why Redis, why Lua — the foundation every algorithm in the next section is built on.</p>
+      <div class="notes"><p>The multi-pod counter problem, the race it creates, the atomic fix, Redis Cluster's hash-tag requirement, and where precision trades off against performance.</p></div>
+      <div class="foot"><span>14 / 43</span><span>act iii · distributed state</span></div>
+    </section>
+
+    <section class="slide" data-section="multi-pod">
+      <div class="eyebrow"><svg class="ic"><use href="#ic-server"/></svg>3.1 · The problem</div>
+      <h2>Every pod counting on its own adds up to nothing</h2>
+      <div class="body meter" style="justify-content:center;">
+        <svg viewBox="0 0 900 220" style="width:100%;height:auto;overflow:visible;">
+          <rect x="20" y="90" width="120" height="50" rx="10" class="sv-box"/><text x="80" y="120" text-anchor="middle" class="sv-lbl">Request</text>
+          <path d="M140 115 H198" class="sv-line" marker-end="url(#arrow-mp)"/>
+          <rect x="200" y="90" width="150" height="50" rx="10" class="sv-box-hot"/><text x="275" y="120" text-anchor="middle" class="sv-lbl">Load Balancer</text>
+          <path d="M350 115 L420 55" class="sv-line" marker-end="url(#arrow-mp)"/>
+          <path d="M350 115 H420" class="sv-line" marker-end="url(#arrow-mp)"/>
+          <path d="M350 115 L420 191" class="sv-line" marker-end="url(#arrow-mp)"/>
+          <rect x="420" y="30" width="150" height="50" rx="10" class="sv-box"/><text x="495" y="55" text-anchor="middle" class="sv-lbl">Pod 1</text><text x="495" y="71" text-anchor="middle" class="sv-hot">counter = 47</text>
+          <rect x="420" y="98" width="150" height="50" rx="10" class="sv-box"/><text x="495" y="123" text-anchor="middle" class="sv-lbl">Pod 2</text><text x="495" y="139" text-anchor="middle" class="sv-hot">counter = 12</text>
+          <rect x="420" y="166" width="150" height="50" rx="10" class="sv-box"/><text x="495" y="191" text-anchor="middle" class="sv-lbl">Pod 3</text><text x="495" y="207" text-anchor="middle" class="sv-hot">counter = 38</text>
+          <text x="700" y="55" class="sv-lbl">each pod thinks</text>
+          <text x="700" y="71" class="sv-lbl-sm">it's under the limit</text>
+          <text x="700" y="145" class="sv-lbl" font-weight="700">real total: 97</text>
+          <text x="700" y="161" class="sv-lbl-sm">limit configured: 50 — bypassed</text>
+          <defs><marker id="arrow-mp" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 Z" class="sv-ink"/></marker></defs>
+        </svg>
+      </div>
+      <div class="notes"><p>Three replicas, three independent in-memory counters, three numbers each under budget — and a real total that isn't. The fix is a counter shared in Redis, not three local ones.</p></div>
+      <div class="foot"><span>15 / 43</span><span>distributed state · the problem</span></div>
+    </section>
+
+    <section class="slide" data-section="race">
+      <div class="eyebrow"><svg class="ic"><use href="#ic-lock"/></svg>3.2–3.3 · Race &amp; fix</div>
+      <h2>Two commands, one race</h2>
+      <div class="split code-left">
+        <div class="stack">
+          <div class="code-label">Two round trips — not atomic</div>
+          <pre class="code">count = INCR(key)      <span class="c">// (1)</span>
+if count == 1:
+  <span class="hl">EXPIRE(key, ttl)</span>    <span class="c">// (2)</span>
+return count</pre>
+        </div>
+        <ul class="points tight" data-step="1">
+          <li><b>Crash between (1) and (2):</b> the key exists with no expiry at all.</li>
+          <li>The counter for that key now grows forever, and every future attempt gets blocked by a limit that never resets.</li>
+          <li><span class="chip">the fix</span> Redis is single-threaded — a Lua script (<code>EVAL</code>/<code>EVALSHA</code>) runs to completion with nothing interleaved. Wrap the read-decide-write in one script and the second pod simply sees the already-updated value.</li>
+        </ul>
+      </div>
+      <div class="notes"><p>This is the sharpest edge in any counter-based limiter built on a key-value store: two commands that look sequential in the code are two separate round trips to the server, and anything can happen in between them.</p></div>
+      <div class="foot"><span>16 / 43</span><span>atomicity · Lua scripts</span></div>
+    </section>
+
+    <section class="slide" data-section="hash-tags">
+      <div class="eyebrow"><svg class="ic"><use href="#ic-server"/></svg>3.4 · Redis Cluster</div>
+      <h2>A Lua script only runs on one node</h2>
+      <div class="split code-left">
+        <pre class="code"><span class="c"># no hash tag — the two keys can land</span>
+<span class="c"># on two different nodes</span>
+rl:user_456:prev  <span class="c">→ node A</span>
+rl:user_456:curr  <span class="c">→ node B</span>  <span class="chip risk" style="margin-left:6px;">CROSSSLOT</span>
+
+<span class="c"># hash tag {} — Redis hashes only</span>
+<span class="c"># the part inside the braces</span>
+<span class="hl">rl:{user_456}:prev</span>  <span class="c">→ hash "user_456" → node B</span>
+<span class="hl">rl:{user_456}:curr</span>  <span class="c">→ hash "user_456" → node B</span>  <span class="chip ok" style="margin-left:6px;">same node</span></pre>
+        <p style="color:var(--body); font-size:16.5px; line-height:1.55;">Two related keys on two different cluster nodes make the Lua script that needs both of them fail outright with a <code>CROSSSLOT</code> error. Wrapping the shared part of the key in <code>{}</code> tells Redis to hash only that substring, guaranteeing every key sharing it lands on the same node — and the script stays legal.</p>
+      </div>
+      <div class="notes"><p>This is a Redis Cluster-specific gotcha that doesn't show up at all against a single Redis instance — worth knowing before the first CROSSSLOT error in production.</p></div>
+      <div class="foot"><span>17 / 43</span><span>redis cluster · hash tags</span></div>
+    </section>
+
+    <section class="slide" data-section="precision-performance">
+      <div class="eyebrow"><svg class="ic"><use href="#ic-scale"/></svg>3.5 · Precision vs. performance</div>
+      <h2>Three points on the same spectrum</h2>
+      <div class="body meter" style="justify-content:center;">
+        <table class="tbl">
+          <thead><tr><th>Approach</th><th>Latency</th><th>Precision</th><th>Scale</th></tr></thead>
+          <tbody>
+            <tr><td class="name">Lua script<span>strong consistency</span></td><td class="mono">1–4ms (Redis round trip)</td><td>Exact</td><td class="num">~100K req/s per node</td></tr>
+            <tr><td class="name">Local cache<span>async-synced every 100ms</span></td><td class="mono">~0ms</td><td>Can overshoot ~10–30% briefly</td><td class="num">Millions req/s</td></tr>
+            <tr><td class="name">Approximate<span>probabilistic</span></td><td class="mono">~0ms</td><td>Low</td><td class="num">Unbounded</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <ul class="points tight" data-step="1">
+        <li>The local-cache pattern is fine for a social feed's like counter and unacceptable for billing — three pods unsynced for 100ms can let through up to 3× the limit in that window.</li>
+      </ul>
+      <div class="notes"><p>This table is the one to return to whenever someone asks "why don't we just cache the counter locally" — the answer depends entirely on what the limit is protecting.</p></div>
+      <div class="foot"><span>18 / 43</span><span>precision vs. performance</span></div>
+    </section>
+
+    <!-- ============ SECTION 4 — ALGORITHMS ============ -->
+    <section class="slide divider" data-section="divider-04">
+      <div class="divider-num">04</div>
+      <div class="section-tag"><i></i>SECTION 4</div>
+      <h2>Algorithms</h2>
+      <p class="lead">Six ways to decide whether a request gets through — all six assume the Redis + Lua foundation above.</p>
+      <div class="notes"><p>Cheapest first: fixed window, sliding log, sliding counter, token bucket, leaky bucket, then GCRA as the one-field rewrite of token bucket.</p></div>
+      <div class="foot"><span>19 / 43</span><span>act iv · algorithms</span></div>
     </section>
 
     <section class="slide" data-section="token-bucket">
-      <div class="eyebrow"><svg class="ic"><use href="#ic-bucket"/></svg>Token bucket</div>
+      <div class="eyebrow"><svg class="ic"><use href="#ic-bucket"/></svg>4.4 · Token bucket</div>
       <h2>A burst, then a steady drip</h2>
       <div class="split">
         <div class="chart meter">
@@ -503,11 +828,10 @@ body.overview .progress, body.overview .pager { display: none; }
           <li><span class="chip risk">bounded wait</span> If the computed wait exceeds a cap, fail fast instead of queuing indefinitely — a busy caller should hear about it, not stall a batch job.</li>
         </ul>
       </div>
-      <div class="notes"><p>This is the shape Stripe and AWS both use publicly for their API rate limits: a capacity that allows short bursts, refilled at a steady rate. It's the algorithm of choice whenever bursty, human-driven traffic needs some slack.</p></div>
-      <div class="foot"><span>5 / 24</span><span>token bucket</span></div>
+      <div class="notes"><p>Allows controlled bursts, O(1), gives an exact Retry-After, no boundary spike — the generally recommended default. Needs two tuned parameters: capacity and rate.</p></div>
+      <div class="foot"><span>20 / 43</span><span>token bucket</span></div>
     </section>
 
-    <!-- 4 — pacer pseudocode -->
     <section class="slide" data-section="pacer-code">
       <div class="eyebrow"><svg class="ic"><use href="#ic-bucket"/></svg>Token bucket · mechanics</div>
       <h2>Borrow first, then sleep off the debt</h2>
@@ -530,12 +854,11 @@ body.overview .progress, body.overview .pager { display: none; }
         </ul>
       </div>
       <div class="notes"><p>This is how ten concurrent callers end up queued 200 ms apart instead of all waking on the same refill tick and stampeding for the same token.</p></div>
-      <div class="foot"><span>6 / 24</span><span>token bucket · pseudocode</span></div>
+      <div class="foot"><span>21 / 43</span><span>token bucket · pseudocode</span></div>
     </section>
 
-    <!-- 5 — leaky bucket -->
     <section class="slide" data-section="leaky-bucket">
-      <div class="eyebrow"><svg class="ic"><use href="#ic-pipe"/></svg>Leaky bucket</div>
+      <div class="eyebrow"><svg class="ic"><use href="#ic-pipe"/></svg>4.5 · Leaky bucket</div>
       <h2>Smooth the output, not the input</h2>
       <div class="split">
         <div class="chart meter">
@@ -545,16 +868,15 @@ body.overview .progress, body.overview .pager { display: none; }
         <ul class="points">
           <li>Instead of enqueuing thousands of jobs at once, each one gets a delay proportional to its position in the queue: <code>delay = index / jobsPerSecond</code>.</li>
           <li>A durable queue plays the role of the bucket, draining downstream at a constant, predictable rate no matter how bursty the enqueue was.</li>
-          <li><span class="chip">vs. token bucket</span> Token bucket answers "how much burst can I absorb?" Leaky bucket answers "at what steady rate do I drain?" A saturated token bucket behaves like a leaky one.</li>
+          <li><span class="chip">counter vs. queue</span> A counter-based leaky bucket isn't a true smoother — it can still let a burst through if the queue has room. Genuinely smooth output needs a real FIFO queue, like a worker pulling off Kafka.</li>
         </ul>
       </div>
       <div class="notes"><p>Leaky bucket is the traffic-shaping half of the pair — it protects whatever is downstream from ever seeing a spike, at the cost of some added latency for the items at the back of the queue.</p></div>
-      <div class="foot"><span>7 / 24</span><span>leaky bucket</span></div>
+      <div class="foot"><span>22 / 43</span><span>leaky bucket</span></div>
     </section>
 
-    <!-- 6 — fixed window -->
     <section class="slide" data-section="fixed-window">
-      <div class="eyebrow"><svg class="ic"><use href="#ic-window"/></svg>Fixed window counter</div>
+      <div class="eyebrow"><svg class="ic"><use href="#ic-window"/></svg>4.1 · Fixed window counter</div>
       <h2>Cheap to run, leaky at the seams</h2>
       <div class="split even">
         <div class="chart meter">
@@ -562,16 +884,15 @@ body.overview .progress, body.overview .pager { display: none; }
           <figcaption>A window keyed off "time since first hit" rather than the wall clock: two callers can each open their own 20-second window and never see it collide with anyone else's.</figcaption>
         </div>
         <ul class="points">
-          <li><span class="chip">the appeal</span> One counter per key, reset on a timer. No history to store, trivial to reason about.</li>
+          <li><span class="chip">the appeal</span> One counter per key, reset on a timer. <code>INCR</code> + <code>EXPIRE</code> — doesn't even need Lua, since <code>INCR</code> is already atomic on its own.</li>
           <li><span class="chip risk">boundary burst</span> A caller who spends the limit at the end of window A and again at the start of window B gets roughly double the intended rate in a short span.</li>
           <li>If the counter's TTL is set only on the first hit and never refreshed, the window is anchored to that caller's own history, not to a shared clock — which is what makes two windows able to abut like this.</li>
         </ul>
       </div>
       <div class="notes"><p>This is the classic fixed-window failure mode: burst at the trailing edge of one window, burst again at the leading edge of the next, and the two combine into a spike the limit was never meant to allow.</p></div>
-      <div class="foot"><span>8 / 24</span><span>fixed window counter</span></div>
+      <div class="foot"><span>23 / 43</span><span>fixed window counter</span></div>
     </section>
 
-    <!-- 7 — fixed window uses table -->
     <section class="slide" data-section="inbound-table">
       <div class="eyebrow"><svg class="ic"><use href="#ic-window"/></svg>Fixed window · in the wild</div>
       <h2>Where this shows up in a typical product</h2>
@@ -585,11 +906,10 @@ body.overview .progress, body.overview .pager { display: none; }
           </tbody>
         </table>
       </div>
-      <div class="notes"><p>All three are fixed-window counters underneath. What differs is where the count lives — in-process, or in a store shared across every instance of the service — which is the subject of a later slide.</p></div>
-      <div class="foot"><span>9 / 24</span><span>fixed window · common surfaces</span></div>
+      <div class="notes"><p>All three are fixed-window counters underneath. What differs is where the count lives — in-process, or in a store shared across every instance of the service.</p></div>
+      <div class="foot"><span>24 / 43</span><span>fixed window · common surfaces</span></div>
     </section>
 
-    <!-- 8 — key design trio -->
     <section class="slide" data-section="key-trio">
       <div class="eyebrow"><svg class="ic"><use href="#ic-key"/></svg>Design details that matter</div>
       <h2>Picking the right key is most of the design</h2>
@@ -614,12 +934,11 @@ body.overview .progress, body.overview .pager { display: none; }
         </div>
       </div>
       <div class="notes"><p>All three of these are cheap to get right and expensive to get wrong — they don't change the algorithm, just whether the algorithm is actually enforcing what it looks like it's enforcing.</p></div>
-      <div class="foot"><span>10 / 24</span><span>fixed window · key design</span></div>
+      <div class="foot"><span>25 / 43</span><span>fixed window · key design</span></div>
     </section>
 
-    <!-- 9 — sliding window log -->
     <section class="slide" data-section="sliding-log">
-      <div class="eyebrow"><svg class="ic"><use href="#ic-log"/></svg>Sliding window log</div>
+      <div class="eyebrow"><svg class="ic"><use href="#ic-log"/></svg>4.2 · Sliding window log</div>
       <h2>Perfectly accurate, and it shows in the memory bill</h2>
       <div class="split">
         <div class="chart meter">
@@ -627,18 +946,17 @@ body.overview .progress, body.overview .pager { display: none; }
           <figcaption>Every request is a timestamp. Anything older than the window is trimmed before the remaining ones are counted.</figcaption>
         </div>
         <ul class="points">
-          <li>A common implementation: a sorted set per key. Trim everything older than <code>now − window</code>, then read the remaining size, then add the new timestamp.</li>
+          <li>A Redis sorted set per key: <code>ZREMRANGEBYSCORE</code> trims anything older than the window, <code>ZCARD</code> counts what's left, <code>ZADD</code> writes the new timestamp.</li>
           <li>No boundary artifact at all — the window truly slides, so there's no clock edge to exploit.</li>
-          <li>The cost: memory per key scales with request volume, not with a constant — a hot key under attack is exactly the key that gets expensive.</li>
+          <li>The cost: memory per key scales with request volume, not with a constant. 100 req/min per user × 1M users = 100M sorted-set entries.</li>
         </ul>
       </div>
-      <div class="notes"><p>Sliding window log is the gold standard for accuracy and the worst choice for memory. It earns its keep only where correctness genuinely outweighs the cost — most systems settle for the counter below instead.</p></div>
-      <div class="foot"><span>11 / 24</span><span>sliding window log</span></div>
+      <div class="notes"><p>Sliding window log is the gold standard for accuracy and the worst choice for memory. It earns its keep only where correctness genuinely outweighs the cost — billing is the canonical example.</p></div>
+      <div class="foot"><span>26 / 43</span><span>sliding window log</span></div>
     </section>
 
-    <!-- 10 — sliding window counter -->
     <section class="slide" data-section="sliding-counter">
-      <div class="eyebrow"><svg class="ic"><use href="#ic-gauge"/></svg>Sliding window counter</div>
+      <div class="eyebrow"><svg class="ic"><use href="#ic-gauge"/></svg>4.3 · Sliding window counter</div>
       <h2>An estimate from just two numbers</h2>
       <div class="split">
         <div class="stack">
@@ -656,88 +974,188 @@ body.overview .progress, body.overview .pager { display: none; }
             <label>Elapsed into current window <output id="sw-el-o">5 min</output>
               <input id="sw-el" type="range" min="0" max="15" value="5" /></label>
           </div>
-          <p class="caption">Drag the sliders to see <code>current + previous × (1 − elapsed / window)</code> respond — a 10-per-15-minute limit, the same shape as the login example.</p>
+          <p class="caption">Drag the sliders to see <code>current + previous × (1 − elapsed / window)</code> respond — a 10-per-15-minute limit, the same shape as the login example. It assumes traffic is spread evenly through each window; a burst concentrated at the edges of two windows can still slip to roughly 2× the limit.</p>
         </div>
       </div>
-      <div class="notes"><p>Each key needs only two integers instead of a growing log. It smooths out most of the fixed-window boundary problem for a fraction of the memory of a sliding log — the usual production default.</p></div>
-      <div class="foot"><span>12 / 24</span><span>sliding window counter</span></div>
+      <div class="notes"><p>Each key needs only two integers instead of a growing log. O(1) memory, usually within a few percent of exact — the usual production default for public APIs.</p></div>
+      <div class="foot"><span>27 / 43</span><span>sliding window counter</span></div>
     </section>
 
-    <!-- 11 — where state lives -->
-    
-    <!-- divider 03 -->
-    <section class="slide divider" data-section="divider-03">
-      <div class="divider-num">03</div>
-      <div class="section-tag"><i></i>SECTION 3</div>
-      <h2>State &amp; correctness</h2>
-      <p class="lead">An algorithm is only as honest as the counter behind it — and counters have races.</p>
-      <div class="notes"><p>Two slides: where the count actually lives across replicas, and the INCR/EXPIRE race that corrupts it.</p></div>
-      <div class="foot"><span>13 / 24</span><span>act iii · distributed state</span></div>
-    </section>
-
-    <section class="slide" data-section="state-trio">
-      <div class="eyebrow"><svg class="ic"><use href="#ic-gauge"/></svg>Distributed state</div>
-      <h2>Where the counter lives sets the real limit</h2>
-      <div class="trio">
-        <div class="card lift">
-          <svg class="ic"><use href="#ic-window"/></svg>
-          <div class="k">In-process memory</div>
-          <div class="t">Cheap, but per-replica</div>
-          <p>A local cache per instance means the effective limit is the configured value multiplied by the replica count — worth stating explicitly wherever this trade-off is made.</p>
-        </div>
-        <div class="card lift">
-          <svg class="ic"><use href="#ic-gate"/></svg>
-          <div class="k">Shared store</div>
-          <div class="t">Redis, Memcached</div>
-          <p>Every instance reads and writes the same counter, so the configured limit is the real limit — at the cost of a network round trip per check.</p>
-        </div>
-        <div class="card lift">
-          <svg class="ic"><use href="#ic-valve"/></svg>
-          <div class="k">Vendor-side</div>
-          <div class="t">The limit you don't control</div>
-          <p>Calling a third-party API means their bucket, their window, their rules — visible to you only through response headers and 429s.</p>
-        </div>
-      </div>
-      <div class="notes"><p>None of these three is wrong on its own — the mistake is not knowing which one a given limiter uses, and being surprised when horizontal scaling quietly changes the effective rate.</p></div>
-      <div class="foot"><span>14 / 24</span><span>where state lives</span></div>
-    </section>
-
-    <!-- 12 — atomic race -->
-    <section class="slide" data-section="race">
-      <div class="eyebrow"><svg class="ic"><use href="#ic-lock"/></svg>Race conditions</div>
-      <h2>Two commands, one race</h2>
+    <section class="slide" data-section="gcra">
+      <div class="eyebrow"><svg class="ic"><use href="#ic-clock"/></svg>4.6 · GCRA</div>
+      <h2>Token bucket, rewritten as an appointment book</h2>
       <div class="split code-left">
-        <div class="stack">
-          <div class="code-label">Two round trips — not atomic</div>
-          <pre class="code">count = INCR(key)      <span class="c">// (1)</span>
-if count == 1:
-  <span class="hl">EXPIRE(key, ttl)</span>    <span class="c">// (2)</span>
-return count</pre>
-        </div>
-        <ul class="points tight" data-step="1">
-          <li><b>Crash between (1) and (2):</b> the key exists with no expiry at all.</li>
-          <li>The counter for that key now grows forever, and every future attempt gets blocked by a limit that never resets.</li>
-          <li><span class="chip">the fix</span> Push both commands into a single Lua script (or a native atomic primitive) so the store runs them as one unit — either both happen, or neither does.</li>
+        <pre class="code"><span class="c">// tat = "theoretical arrival time" — one field,</span>
+<span class="c">// not {tokens, last_ts}</span>
+now  = current_time()
+tat  = max(GET(key), now)
+allow_at = tat - burst_window
+
+if now &gt;= allow_at:
+  <span class="hl">SET(key, tat + emission_interval)</span>
+  return ALLOWED
+else:
+  return DENIED, retry_after = allow_at - now</pre>
+        <ul class="points tight">
+          <li>Mathematically equivalent to token bucket — same burst allowance, same steady rate — but stores <b>one</b> value instead of two.</li>
+          <li>Used inside <code>redis-cell</code>, a native Redis module that implements this in C.</li>
+          <li>Rarely hand-rolled in application code: token bucket is easier to reason about and just as capable. Worth knowing GCRA exists as "the one-field version."</li>
         </ul>
       </div>
-      <div class="notes"><p>This is the sharpest edge in any counter-based limiter built on a key-value store: two commands that look sequential in the code are two separate round trips to the server, and anything can happen in between them.</p></div>
-      <div class="foot"><span>15 / 24</span><span>atomicity</span></div>
+      <div class="notes"><p>Generic Cell Rate Algorithm — originally from ATM network traffic control, repurposed for API rate limiting. The name is the least intuitive part; the mechanism is a direct restatement of token bucket.</p></div>
+      <div class="foot"><span>28 / 43</span><span>gcra · generic cell rate algorithm</span></div>
     </section>
 
-    <!-- 13 — outbound 429 handling -->
-    
-    <!-- divider 04 -->
-    <section class="slide divider" data-section="divider-04">
-      <div class="divider-num">04</div>
-      <div class="section-tag"><i></i>SECTION 4</div>
-      <h2>Being a good client</h2>
-      <p class="lead">The other half of rate limiting: pacing outbound calls and absorbing a 429 without causing the next one.</p>
-      <div class="notes"><p>Retry-After, a shared circuit gate, backoff schedules, and why every one of them still needs jitter.</p></div>
-      <div class="foot"><span>16 / 24</span><span>act iv · backpressure</span></div>
+    <section class="slide" data-section="algo-comparison">
+      <div class="eyebrow"><svg class="ic"><use href="#ic-scale"/></svg>Six algorithms, compared</div>
+      <h2>There's a default, and it's token bucket</h2>
+      <div class="body meter" style="justify-content:center;">
+        <table class="tbl">
+          <thead><tr><th>Algorithm</th><th>Memory</th><th>Boundary spike</th><th>Allows burst</th><th>Exact Retry-After</th><th>Best for</th></tr></thead>
+          <tbody>
+            <tr><td class="name">Fixed Window</td><td class="mono">O(1)</td><td><span class="chip risk">up to 2×</span></td><td>—</td><td>—</td><td>Simple, low-stakes limits</td></tr>
+            <tr><td class="name">Sliding Log</td><td class="mono">O(N)</td><td><span class="chip ok">none</span></td><td>—</td><td>—</td><td>Billing, exact accounting</td></tr>
+            <tr><td class="name">Sliding Counter</td><td class="mono">O(1)</td><td><span class="chip hot">~2× worst case</span></td><td>—</td><td>—</td><td>Most public APIs</td></tr>
+            <tr><td class="name">Token Bucket</td><td class="mono">O(1)</td><td><span class="chip ok">none</span></td><td><span class="chip ok">yes</span></td><td><span class="chip ok">yes</span></td><td><b>Default choice</b></td></tr>
+            <tr><td class="name">Leaky Bucket</td><td class="mono">O(1)</td><td><span class="chip ok">none</span></td><td>—</td><td><span class="chip ok">yes</span></td><td>Protecting a downstream system</td></tr>
+            <tr><td class="name">GCRA</td><td class="mono">O(1), 1 field</td><td><span class="chip ok">none</span></td><td><span class="chip ok">yes</span></td><td><span class="chip ok">yes</span></td><td>Same as token bucket, tighter storage</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="notes"><p>When in doubt, reach for token bucket. Reach for sliding log only when the accuracy genuinely has to be exact, and for leaky bucket specifically when the thing you're protecting is downstream, not yourself.</p></div>
+      <div class="foot"><span>29 / 43</span><span>algorithm comparison</span></div>
+    </section>
+
+    <!-- ============ SECTION 5 — SYSTEM DESIGN ============ -->
+    <section class="slide divider" data-section="divider-05">
+      <div class="divider-num">05</div>
+      <div class="section-tag"><i></i>SECTION 5</div>
+      <h2>System design</h2>
+      <p class="lead">Putting it together: a worked example at 10 million users and 100,000 requests a second.</p>
+      <div class="notes"><p>Requirements, architecture, sharding, hard vs. soft limits, fail-open vs. fail-closed, and backpressure toward third-party APIs.</p></div>
+      <div class="foot"><span>30 / 43</span><span>act v · system design</span></div>
+    </section>
+
+    <section class="slide" data-section="requirements">
+      <div class="eyebrow"><svg class="ic"><use href="#ic-gauge"/></svg>5.1 · Requirements</div>
+      <h2>A worked example</h2>
+      <div class="trio">
+        <div class="card lift" style="align-items:flex-start;">
+          <div class="big" style="font-size:56px;">10</div>
+          <div class="big-unit">million users</div>
+        </div>
+        <div class="card lift" style="align-items:flex-start;">
+          <div class="big" style="font-size:56px;">100</div>
+          <div class="big-unit">thousand req/s peak</div>
+        </div>
+        <div class="card lift" style="align-items:flex-start;">
+          <div class="big" style="font-size:56px;">&lt;5</div>
+          <div class="big-unit">ms latency overhead</div>
+        </div>
+      </div>
+      <ul class="points tight" data-step="1">
+        <li><b>Per-user limit:</b> 1,000 req/min. <b>Global limit:</b> 500,000 req/min per endpoint.</li>
+        <li><b>Availability target:</b> 99.99% — the limiter itself must not become the outage.</li>
+      </ul>
+      <div class="notes"><p>These numbers drive every choice on the next few slides: why the limit gets sharded, why fail-open is the default, why 5ms of Redis round-trip is a real budget line, not a rounding error.</p></div>
+      <div class="foot"><span>31 / 43</span><span>system design · requirements</span></div>
+    </section>
+
+    <section class="slide" data-section="architecture">
+      <div class="eyebrow"><svg class="ic"><use href="#ic-server"/></svg>5.2 · Architecture</div>
+      <h2>Where the rate-limit service sits</h2>
+      <div class="body meter" style="justify-content:center;">
+        <svg viewBox="0 0 1120 200" style="width:100%;height:auto;overflow:visible;">
+          <rect x="10" y="75" width="110" height="50" rx="10" class="sv-box"/><text x="65" y="97" text-anchor="middle" class="sv-lbl">Clients</text><text x="65" y="113" text-anchor="middle" class="sv-lbl-sm">web · mobile</text>
+          <path d="M120 100 H168" class="sv-line" marker-end="url(#arrow-arch)"/>
+          <rect x="170" y="75" width="110" height="50" rx="10" class="sv-box"/><text x="225" y="97" text-anchor="middle" class="sv-lbl">Edge</text><text x="225" y="113" text-anchor="middle" class="sv-lbl-sm">DDoS · IP block</text>
+          <path d="M280 100 H328" class="sv-line" marker-end="url(#arrow-arch)"/>
+          <rect x="330" y="75" width="110" height="50" rx="10" class="sv-box"/><text x="385" y="97" text-anchor="middle" class="sv-lbl">Nginx</text><text x="385" y="113" text-anchor="middle" class="sv-lbl-sm">per-IP limit</text>
+          <path d="M440 100 H488" class="sv-line" marker-end="url(#arrow-arch)"/>
+          <rect x="490" y="75" width="110" height="50" rx="10" class="sv-box"/><text x="545" y="97" text-anchor="middle" class="sv-lbl">App pods</text><text x="545" y="113" text-anchor="middle" class="sv-lbl-sm">×N</text>
+          <path d="M600 90 H648" class="sv-line" marker-end="url(#arrow-arch)"/>
+          <path d="M600 110 H648" class="sv-line" marker-end="url(#arrow-arch)"/>
+          <rect x="650" y="45" width="140" height="50" rx="10" class="sv-box-hot"/><text x="720" y="67" text-anchor="middle" class="sv-lbl">Rate Limit Svc</text><text x="720" y="83" text-anchor="middle" class="sv-lbl-sm">token bucket + GCRA</text>
+          <rect x="650" y="105" width="140" height="50" rx="10" class="sv-box"/><text x="720" y="127" text-anchor="middle" class="sv-lbl">Business Services</text>
+          <path d="M790 70 H838" class="sv-line" marker-end="url(#arrow-arch)"/>
+          <rect x="840" y="45" width="270" height="50" rx="10" class="sv-box"/><text x="975" y="63" text-anchor="middle" class="sv-lbl">Redis Cluster</text><text x="975" y="79" text-anchor="middle" class="sv-lbl-sm">shard A · shard B · shard C</text>
+          <defs><marker id="arrow-arch" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 Z" class="sv-ink"/></marker></defs>
+        </svg>
+      </div>
+      <div class="notes"><p>The rate-limit check is its own hop the application pods call before proceeding — not embedded ad hoc inside each business service.</p></div>
+      <div class="foot"><span>32 / 43</span><span>system design · architecture</span></div>
+    </section>
+
+    <section class="slide" data-section="sharding">
+      <div class="eyebrow"><svg class="ic"><use href="#ic-server"/></svg>5.3 · Redis Cluster sharding</div>
+      <h2>Per-user keys hash naturally; global keys don't</h2>
+      <div class="split code-left">
+        <pre class="code"><span class="c">// per-user: one natural key, one node</span>
+<span class="hl">rl:{user_456}:token</span>
+<span class="c">// hash "user_456" → 1 fixed slot → 1 fixed node
+// Lua script stays legal, no CROSSSLOT</span>
+
+<span class="c">// global per-endpoint: no natural entity key,</span>
+<span class="c">// so split across N shards instead</span>
+<span class="hl">rl:global:{/api/send}:shard:{random(0,15)}</span>
+<span class="c">// 16 shards, each budgeted at
+// total_limit / 16 × 1.1   (10% buffer)</span></pre>
+        <p style="color:var(--body); font-size:16.5px; line-height:1.55;">A per-user limit has a natural key and hashes to one node cleanly. A global, per-endpoint limit has no such entity — sharding it across 16 keys spreads the writes instead of hammering one hot key, trading a small amount of precision (the buffer) for throughput.</p>
+      </div>
+      <div class="notes"><p>The buffer exists because 16 independently-checked shards can each individually allow a request right at their own edge, letting the true global total run slightly over — accepted on purpose.</p></div>
+      <div class="foot"><span>33 / 43</span><span>sharding · per-user vs. global</span></div>
+    </section>
+
+    <section class="slide" data-section="hard-soft">
+      <div class="eyebrow"><svg class="ic"><use href="#ic-scale"/></svg>5.4 · Hard limit vs. soft limit</div>
+      <h2>Same check, a different response to the result</h2>
+      <div class="two">
+        <div class="card lift">
+          <svg class="ic"><use href="#ic-lock"/></svg>
+          <div class="k">Hard limit</div>
+          <div class="t">Crossing it rejects immediately</div>
+          <p>Free tier: 100 req/min, no exceptions. Behavior: an instant <code>429</code>. Used for security and preventing abuse — there's no negotiating with it.</p>
+        </div>
+        <div class="card lift">
+          <svg class="ic"><use href="#ic-scale"/></svg>
+          <div class="k">Soft limit</div>
+          <div class="t">Crossing it warns, but keeps serving</div>
+          <p>Pro tier: 1,000 req/min — cross it and the request still goes through, logged and flagged for an overage charge rather than rejected. Business flexibility, not security.</p>
+        </div>
+      </div>
+      <pre class="code" data-step="1">val result = rateLimiter.check(userId)
+when {
+  result.count &gt; hardLimit -&gt; return HTTP_429
+  result.count &gt; softLimit -&gt; { logger.warn("approaching limit"); proceed() }
+  else -&gt; proceed()
+}</pre>
+      <div class="notes"><p>The same rateLimiter.check() call backs both — what differs is purely what the caller does with the result.</p></div>
+      <div class="foot"><span>34 / 43</span><span>hard limit vs. soft limit</span></div>
+    </section>
+
+    <section class="slide" data-section="fail-open-closed">
+      <div class="eyebrow"><svg class="ic"><use href="#ic-shield"/></svg>5.5 · When Redis itself is down</div>
+      <h2>Fail-open vs. fail-closed</h2>
+      <div class="two">
+        <div class="card lift">
+          <svg class="ic"><use href="#ic-shield"/></svg>
+          <div class="k">Fail-open</div>
+          <div class="t">Let every request through</div>
+          <p>Higher availability, briefly no protection. Most public APIs choose this, paired with a circuit breaker and tight monitoring — an outage in the limiter shouldn't take down the product it was protecting.</p>
+        </div>
+        <div class="card lift">
+          <svg class="ic"><use href="#ic-shield"/></svg>
+          <div class="k">Fail-closed</div>
+          <div class="t">Reject everything</div>
+          <p>Protects billing and security, drops availability to zero for the duration. Chosen when letting anything unmetered through is worse than an outage — payment and quota enforcement, mostly.</p>
+        </div>
+      </div>
+      <div class="notes"><p>"Most public APIs fail open" is the practical default — the limiter existing to protect availability shouldn't itself become the single point of failure that removes it.</p></div>
+      <div class="foot"><span>35 / 43</span><span>fail-open vs. fail-closed</span></div>
     </section>
 
     <section class="slide" data-section="outbound-429">
-      <div class="eyebrow"><svg class="ic"><use href="#ic-valve"/></svg>Being a good client</div>
+      <div class="eyebrow"><svg class="ic"><use href="#ic-valve"/></svg>5.6 · Being a good client</div>
       <h2>Pace before the limit, absorb the 429 after</h2>
       <div class="two">
         <div class="card lift">
@@ -757,10 +1175,9 @@ return count</pre>
         <div class="legend"><span><i class="lg-bar"></i>pacer draining evenly, ahead of the limit</span><span><i class="lg-dot" style="background:var(--reject)"></i>429 → gate closes for a bounded window</span></div>
       </div>
       <div class="notes"><p>A token-bucket pacer and a reactive circuit gate solve different halves of the same problem: the pacer tries to never get a 429 in the first place, the gate makes sure one 429 isn't wasted as a signal only its own caller sees.</p></div>
-      <div class="foot"><span>17 / 24</span><span>client-side backpressure</span></div>
+      <div class="foot"><span>36 / 43</span><span>client-side backpressure</span></div>
     </section>
 
-    <!-- 14 — backoff table -->
     <section class="slide" data-section="backoff-table">
       <div class="eyebrow"><svg class="ic"><use href="#ic-clock"/></svg>Backoff schedules</div>
       <h2>Three schedules, one of them has jitter</h2>
@@ -775,72 +1192,19 @@ return count</pre>
         </table>
       </div>
       <div class="notes"><p>The two schedules with no jitter are exactly the ones where a real outage produces a genuine thundering herd — every failed job wakes up at the same computed instant.</p></div>
-      <div class="foot"><span>18 / 24</span><span>backoff schedules</span></div>
+      <div class="foot"><span>37 / 43</span><span>backoff schedules</span></div>
     </section>
 
-    <!-- 15 — thundering herd -->
-    <section class="slide" data-section="herd">
-      <div class="eyebrow"><svg class="ic"><use href="#ic-die"/></svg>Why jitter matters</div>
-      <h2>1,000 clients, no jitter, waking in unison</h2>
-      <div class="body">
-        <div class="seg" id="herd-seg" role="group" aria-label="Backoff mode">
-          <button data-mode="none" aria-pressed="true">No jitter</button>
-          <button data-mode="equal">Equal jitter</button>
-          <button data-mode="full">Full jitter</button>
-        </div>
-        <div class="chart meter">
-          <svg id="herd"></svg>
-          <figcaption>A downstream API drops for two minutes; 1,000 queued jobs fail together and retry on <code>30s → 90s → 210s</code>. Each bin is 5 seconds.</figcaption>
-        </div>
-        <p class="readout" id="herd-readout"></p>
-      </div>
-      <div class="notes"><p>Exponential backoff only spaces the retries further apart over time — it never makes concurrent clients diverge from each other. Jitter is the only ingredient that does that. Full jitter produces the lowest total load; equal jitter guarantees at least half the base delay.</p></div>
-      <div class="foot"><span>19 / 24</span><span>jitter · simulated, per AWS's "Exponential Backoff and Jitter"</span></div>
+    <!-- ============ SECTION 6 — DEMO ============ -->
+    <section class="slide divider" data-section="divider-06">
+      <div class="divider-num">06</div>
+      <div class="section-tag"><i></i>SECTION 6</div>
+      <h2>Demo</h2>
+      <p class="lead">A real app, not a mock — switch the algorithm live and watch the difference immediately.</p>
+      <div class="notes"><p>The reference project ships a full Kotlin/Micronaut backend and React frontend with an admin panel and SSE-streamed state; this deck's demo.html is the static-site equivalent.</p></div>
+      <div class="foot"><span>38 / 43</span><span>act vi · demo</span></div>
     </section>
 
-    <!-- 16 — three jitter formulas -->
-    <section class="slide" data-section="jitter-formulas">
-      <div class="eyebrow"><svg class="ic"><use href="#ic-die"/></svg>Three jitter formulas</div>
-      <h2>Equal jitter is the common middle ground</h2>
-      <div class="split even">
-        <table class="tbl">
-          <thead><tr><th>Style</th><th>Wait time</th></tr></thead>
-          <tbody>
-            <tr><td class="name">Full jitter</td><td class="mono">random(0, min(cap, base·2ⁿ))</td></tr>
-            <tr><td class="name">Equal jitter</td><td class="mono">t/2 + random(0, t/2)</td></tr>
-            <tr><td class="name">Decorrelated</td><td class="mono">min(cap, random(base, prev·3))</td></tr>
-          </tbody>
-        </table>
-        <div class="stack">
-          <pre class="code">base = min(previousDelay * multiplier, maxDelay)
-<span class="hl">return random(base / 2, base + 1)</span></pre>
-          <p class="lead" style="font-size:16.5px;" data-step="1"><b>One catch:</b> if the next attempt's base is computed from the previous <em>jittered</em> delay rather than the original, each retry only grows by roughly <b>1.5×</b> on average, not the intended 2×.</p>
-        </div>
-      </div>
-      <div class="notes"><p>Full jitter produces the lowest aggregate load, per AWS's own writeup. Decorrelated jitter is attractive because it needs no retry counter at all — only the previous wait.</p></div>
-      <div class="foot"><span>20 / 24</span><span>jitter formulas</span></div>
-    </section>
-
-    <!-- 17 — Retry-After still needs jitter -->
-    <section class="slide" data-section="retry-after">
-      <div class="eyebrow"><svg class="ic"><use href="#ic-die"/></svg>Retry-After still needs jitter</div>
-      <h2>"Wait 60 seconds" — and everyone wakes at second 60</h2>
-      <div class="body">
-        <div class="seg" id="ra-seg" role="group" aria-label="With or without jitter">
-          <button data-mode="exact" aria-pressed="true">Retry-After, exact</button>
-          <button data-mode="jitter">+ random(0, 20%)</button>
-        </div>
-        <div class="chart meter">
-          <svg id="ra"></svg>
-          <figcaption>400 jobs are rejected at once, every one of them handed the same <code>Retry-After: 60</code>.</figcaption>
-        </div>
-        <p class="readout" id="ra-readout"></p>
-      </div>
-      <div class="notes"><p>The header tells every caller the same number, so obeying it literally recreates the herd it was meant to prevent. Adding a small jitter on top — retryAfter + random(0, 20%) — is the cheapest fix.</p></div>
-      <div class="foot"><span>21 / 24</span><span>Retry-After · jitter</span></div>
-    </section>
-
-    <!-- try it yourself -->
     <section class="slide" data-section="try-it">
       <div class="eyebrow"><svg class="ic"><use href="#ic-gate"/></svg>Hands on</div>
       <h2>Open it in four tabs and get throttled</h2>
@@ -854,8 +1218,9 @@ return count</pre>
           </p>
           <ul class="points tight">
             <li><b>Shared bucket</b> — every tab draws from the same 5 tokens, refilling at 1/s, no matter how many tabs are open.</li>
-            <li><b>Per-tab bucket</b> — flip the toggle and each tab gets its own bucket, reproducing the "in-process memory ⇒ limit × replica count" bug from slide 14.</li>
+            <li><b>Per-tab bucket</b> — flip the toggle and each tab gets its own bucket, reproducing the multi-pod counter bug from §3.1.</li>
           </ul>
+          <p style="color:var(--muted); font-size:14.5px; line-height:1.5;">The reference project's own demo goes further: an admin page that switches the live algorithm and its parameters without a restart, a per-user state visualizer over SSE, and a scripted "boundary spike" run that times a burst to land exactly across a Fixed Window reset.</p>
         </div>
         <div class="card lift" style="justify-content:center; align-items:flex-start; gap:18px;">
           <svg class="ic"><use href="#ic-valve"/></svg>
@@ -865,37 +1230,58 @@ return count</pre>
         </div>
       </div>
       <div class="notes"><p>Open this link yourself in a few tabs before presenting it live — the shared bucket makes for a genuinely fun "watch us all get blocked together" moment.</p></div>
-      <div class="foot"><span>22 / 24</span><span>demo · try it yourself</span></div>
+      <div class="foot"><span>39 / 43</span><span>demo · try it yourself</span></div>
     </section>
 
-    <!-- 18 — takeaways -->
+    <!-- ============ SECTION 7 — CHECKPOINT QUESTIONS ============ -->
+    <section class="slide divider" data-section="divider-07">
+      <div class="divider-num">07</div>
+      <div class="section-tag"><i></i>SECTION 7</div>
+      <h2>Checkpoint questions</h2>
+      <p class="lead">Three questions, easy to hard — a quick way to check the ideas actually landed.</p>
+      <div class="notes"><p>Use these live: ask, pause, then reveal. The hard question is a good one to leave as a take-home if time runs short.</p></div>
+      <div class="foot"><span>40 / 43</span><span>act vii · checkpoint questions</span></div>
+    </section>
 
-    <!-- divider 05 -->
-    <section class="slide divider" data-section="divider-05">
-      <div class="divider-num">05</div>
-      <div class="section-tag"><i></i>SECTION 5</div>
+    <section class="slide" data-section="checkpoint">
+      <div class="eyebrow"><svg class="ic"><use href="#ic-question"/></svg>Checkpoint questions</div>
+      <h2>Easy, medium, hard</h2>
+      <ul class="points">
+        <li><span class="chip ok">easy</span> <b>Which HTTP status code is returned when a rate limit is exceeded?</b><br/><span style="color:var(--muted);">→ <code>429 Too Many Requests</code>, with a <code>Retry-After</code> header telling the client how long to wait.</span></li>
+        <li data-step="1"><span class="chip hot">medium</span> <b>Why does a Fixed Window Counter let through roughly 2× traffic at a window boundary?</b><br/><span style="color:var(--muted);">→ Each window resets independently: 100 requests at <code>12:00:59</code> fill window 12:00; the clock ticks over, the counter resets to zero, and 100 more immediately after are also allowed — 200 requests in about two seconds against a 100/minute limit. A sliding window never resets abruptly, so it doesn't have this edge.</span></li>
+        <li data-step="2"><span class="chip risk">hard</span> <b>A Redis round trip costs ~5ms per check. How does that cap throughput, and how would you optimize it?</b><br/><span style="color:var(--muted);">→ One thread tops out around 1000ms / 5ms = 200 req/s; 100 concurrent coroutines gets to ~20,000 req/s — not unlimited. In roughly increasing effort: <code>EVALSHA</code> instead of <code>EVAL</code>, a pooled connection, a local cache synced every ~100ms (cuts round trips ~99%, can briefly overshoot), colocating Redis in the same availability zone, and pipelining non-Lua commands where the operation allows it.</span></li>
+      </ul>
+      <div class="notes"><p>The hard question's answer is really a menu, not a single fix — most real systems combine two or three of these rather than picking one.</p></div>
+      <div class="foot"><span>41 / 43</span><span>checkpoint questions</span></div>
+    </section>
+
+    <!-- ============ TAKEAWAYS ============ -->
+    <section class="slide divider" data-section="divider-08">
+      <div class="divider-num">08</div>
+      <div class="section-tag"><i></i>SECTION 8</div>
       <h2>Takeaways</h2>
       <p class="lead">Five things worth carrying out of this room.</p>
       <div class="notes"><p>Close on the two roles from the cover: protecting your own system, and behaving as a good client of someone else's.</p></div>
-      <div class="foot"><span>23 / 24</span><span>act v · summary</span></div>
+      <div class="foot"><span>42 / 43</span><span>act viii · summary</span></div>
     </section>
 
     <section class="slide" data-section="takeaways">
       <div class="eyebrow"><svg class="ic"><use href="#ic-list"/></svg>Takeaways</div>
       <h2>Five things worth remembering</h2>
       <ul class="points">
-        <li><span class="chip">algorithm</span> Token bucket for bursty inbound traffic; leaky bucket when the output rate matters more than the input shape; a counter for everything else.</li>
-        <li><span class="chip">correctness</span> Any read-then-write on a shared counter needs an atomic primitive — a Lua script or equivalent — or a crash between the two steps corrupts the count.</li>
+        <li><span class="chip">algorithm</span> Token bucket for bursty inbound traffic; leaky bucket when the output rate matters more than the input shape; a counter for everything else. GCRA is token bucket with one field instead of two.</li>
+        <li><span class="chip">correctness</span> Any read-then-write on a shared counter needs an atomic primitive — a Lua script or equivalent — or a crash between the two steps corrupts the count. In a cluster, remember the hash tag.</li>
         <li><span class="chip">design</span> The key and the response code carry as much risk as the algorithm: never key on caller-supplied data alone, and never let a 429 reveal information a 401 wouldn't.</li>
         <li><span class="chip">scale</span> Know whether the counter lives per-process or in a shared store — that answer, not the algorithm, decides what the limit actually is once you scale out.</li>
         <li><span class="chip">backoff</span> Exponential backoff spaces retries apart over time; only jitter spreads concurrent clients apart from each other — and a server-issued Retry-After still needs it.</li>
       </ul>
       <div class="notes"><p>Close by connecting back to the two roles from slide 1: everything here is either protecting a system from its callers, or being a well-behaved caller of someone else's.</p></div>
-      <div class="foot"><span>24 / 24</span><span>rate-limiting.dev</span></div>
+      <div class="foot"><span>43 / 43</span><span>rate-limiting.dev</span></div>
     </section>
 
   </div>
 </div>
+
 
 <div class="progress"><i></i></div>
 <div class="pager"></div>
