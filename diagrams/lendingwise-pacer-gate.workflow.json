@@ -1,0 +1,200 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "LendingWise Pacer + Gate",
+    "animation": "trace",
+    "quality_profile": "showcase"
+  },
+  "lanes": [
+    {
+      "id": "app",
+      "label": "Application"
+    },
+    {
+      "id": "guard",
+      "label": "Feign Interceptors"
+    },
+    {
+      "id": "vendor",
+      "label": "Vendor"
+    }
+  ],
+  "groups": [
+    {
+      "id": "guards",
+      "label": "Runs before every outbound call",
+      "lane": "guard",
+      "fromCol": 1,
+      "toCol": 2,
+      "variant": "emphasis"
+    }
+  ],
+  "mainPath": [
+    "call",
+    "pacer",
+    "gate",
+    "vendorCall",
+    "decoder",
+    "success"
+  ],
+  "nodes": [
+    {
+      "id": "call",
+      "lane": "app",
+      "col": 0,
+      "type": "frontend",
+      "label": "Outbound Call",
+      "sublabel": "app code needs LendingWise",
+      "width": 132
+    },
+    {
+      "id": "pacer",
+      "lane": "guard",
+      "col": 1,
+      "type": "backend",
+      "label": "Rate Pacer",
+      "sublabel": "acquire() \u2014 token bucket",
+      "width": 150
+    },
+    {
+      "id": "gate",
+      "lane": "guard",
+      "col": 2,
+      "type": "security",
+      "label": "Rate Gate",
+      "sublabel": "remaining() \u2014 shared closedUntil",
+      "width": 160
+    },
+    {
+      "id": "vendorCall",
+      "lane": "vendor",
+      "col": 3,
+      "type": "external",
+      "label": "LendingWise API",
+      "width": 132
+    },
+    {
+      "id": "decoder",
+      "lane": "app",
+      "col": 4,
+      "type": "backend",
+      "label": "Error Decoder",
+      "sublabel": "checks status == 429",
+      "width": 132
+    },
+    {
+      "id": "success",
+      "lane": "app",
+      "col": 5,
+      "type": "backend",
+      "label": "Response",
+      "sublabel": "200 OK",
+      "width": 132
+    },
+    {
+      "id": "pacerThrow",
+      "lane": "app",
+      "col": 1,
+      "type": "messagebus",
+      "label": "Throws",
+      "sublabel": "computed wait > MAX_WAIT",
+      "width": 132
+    },
+    {
+      "id": "gateThrow",
+      "lane": "app",
+      "col": 2,
+      "type": "messagebus",
+      "label": "Throws",
+      "sublabel": "still closed from last 429",
+      "width": 132
+    },
+    {
+      "id": "closeGate",
+      "lane": "vendor",
+      "col": 5,
+      "type": "security",
+      "label": "gate.close()",
+      "sublabel": "closedUntil = now + Retry-After",
+      "width": 160
+    }
+  ],
+  "edges": [
+    {
+      "id": "call-pacer",
+      "from": "call",
+      "to": "pacer",
+      "variant": "default"
+    },
+    {
+      "id": "pacer-gate",
+      "from": "pacer",
+      "to": "gate",
+      "label": "token reserved",
+      "variant": "default"
+    },
+    {
+      "id": "gate-vendor",
+      "from": "gate",
+      "to": "vendorCall",
+      "label": "gate open",
+      "variant": "emphasis"
+    },
+    {
+      "id": "vendor-decoder",
+      "from": "vendorCall",
+      "to": "decoder",
+      "variant": "default"
+    },
+    {
+      "id": "decoder-success",
+      "from": "decoder",
+      "to": "success",
+      "label": "2xx",
+      "variant": "emphasis"
+    },
+    {
+      "id": "pacer-throw",
+      "from": "pacer",
+      "to": "pacerThrow",
+      "label": "no work sent",
+      "variant": "dashed",
+      "role": "branch"
+    },
+    {
+      "id": "gate-throw",
+      "from": "gate",
+      "to": "gateThrow",
+      "label": "no work sent",
+      "variant": "dashed",
+      "role": "branch"
+    },
+    {
+      "id": "decoder-close",
+      "from": "decoder",
+      "to": "closeGate",
+      "label": "429",
+      "variant": "security",
+      "role": "error"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Proactive vs. reactive",
+      "items": [
+        "RatePacer runs first, spending a token before the call ever leaves the process \u2014 it tries to never earn a 429",
+        "RateLimitGate runs second, and only ever reacts after a 429 has already happened once"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "One 429 speaks for the whole process",
+      "items": [
+        "gate.close(backoff) sets one shared closedUntil timestamp",
+        "Every other concurrent call's gate check reads that same value and throws immediately \u2014 no other thread discovers the limit by being rejected itself"
+      ]
+    }
+  ]
+}

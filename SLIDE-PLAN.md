@@ -44,20 +44,32 @@ and card, doing double duty as illustration.
   100ms stagger once the slide becomes active, instead of the whole slide appearing as one block —
   the deck-wide fix for reading as monotonous. Slide-to-slide navigation crossfades + rises.
 
-## Two live diagrams, not screenshots
+## Live diagrams, not screenshots
 
-The topology slide (§01) and the token-bucket flow embed real interactive diagrams generated with
+Five slides embed real interactive diagrams generated with
 [Archify](https://github.com/tt-a1i/archify) instead of static in-deck SVG: pan, zoom, theme
 toggle, and an "Open full screen ↗" link out to `diagrams/*.html`. Source specs live alongside the
-delivered HTML in `diagrams/` (`*.architecture.json`, `*.workflow.json`) — regenerate with:
+delivered HTML in `diagrams/` (`*.architecture.json`, `*.workflow.json`) — regenerate any of them
+with `deliver` (see below for the two `diagram_type`s in use):
+
+| Diagram | Type | Slide |
+|---|---|---|
+| `request-topology` | architecture | §2 "Client, infrastructure, application" |
+| `token-bucket-flow` | workflow | §4 "Token bucket" |
+| `loanbud-defense-gap` | architecture | Case study — rate limiting vs. reCAPTCHA coverage |
+| `lendingwise-pacer-gate` | workflow | Case study — `LendingWiseRatePacer` + `LendingWiseRateLimitGate` |
+| `worker-lw-sync-park` | workflow | Case study — what `park()` actually does |
 
 ```bash
 npx skills add tt-a1i/archify -g   # once, installs the skill
-node ~/.claude/skills/archify/bin/archify.mjs deliver workflow \
-  diagrams/token-bucket-flow.workflow.json diagrams/token-bucket-flow.html --quality showcase
-node ~/.claude/skills/archify/bin/archify.mjs deliver architecture \
-  diagrams/request-topology.architecture.json diagrams/request-topology.html --quality showcase
+node ~/.claude/skills/archify/bin/archify.mjs deliver <architecture|workflow> \
+  diagrams/<name>.<architecture|workflow>.json diagrams/<name>.html --quality showcase
 ```
+
+The three case-study diagrams come from a real audit of a production system (endpoint-by-endpoint
+defense coverage, and the exact class/method names of its outbound rate limiter) — see
+[`SCRIPT-VI.md`](SCRIPT-VI.md) for the Vietnamese presenter script that walks through what each
+one shows and why it's built the way it is.
 
 ## Hands-on demo (`demo.html`)
 
@@ -117,8 +129,11 @@ Distributed State, Algorithms, System Design, Demo, Checkpoint Questions, and a 
 | 39 | Open it in four tabs and get throttled | split | Link to `demo.html` |
 | **40** | **§7 — Checkpoint questions** | divider | Outline "07" |
 | 41 | Easy, medium, hard | list | Three Q&A |
-| **42** | **Takeaways** | divider | Outline "08" |
-| 43 | Five things worth remembering | list | Closing points (reused) |
+| 42 | Rate limiting alone doesn't stop a bot | full | Live diagram — `loanbud-defense-gap` |
+| 43 | Proactive pacing, reactive gate | full | Live diagram — `lendingwise-pacer-gate` |
+| 44 | What "park" actually means | full | Live diagram — `worker-lw-sync-park` |
+| **45** | **Takeaways** | divider | Outline "08" |
+| 46 | Five things worth remembering | list | Closing points (reused) |
 
 ## Keyboard
 

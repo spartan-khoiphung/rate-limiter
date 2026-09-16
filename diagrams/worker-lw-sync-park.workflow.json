@@ -1,0 +1,161 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "worker-lw-sync: park()",
+    "animation": "trace",
+    "quality_profile": "showcase"
+  },
+  "lanes": [
+    {
+      "id": "batch",
+      "label": "MigrationEngine"
+    },
+    {
+      "id": "decide",
+      "label": "parkFor() decision",
+      "variant": "exception"
+    }
+  ],
+  "mainPath": [
+    "process",
+    "caught",
+    "release",
+    "park",
+    "trust",
+    "sleep"
+  ],
+  "nodes": [
+    {
+      "id": "process",
+      "lane": "batch",
+      "col": 0,
+      "type": "backend",
+      "label": "processBatch()",
+      "sublabel": "claims + syncs a batch of files",
+      "width": 138
+    },
+    {
+      "id": "caught",
+      "lane": "batch",
+      "col": 1,
+      "type": "security",
+      "label": "Catch Exception",
+      "sublabel": "from the pacer or the gate",
+      "width": 150
+    },
+    {
+      "id": "release",
+      "lane": "batch",
+      "col": 2,
+      "type": "database",
+      "label": "releaseBatch()",
+      "sublabel": "claimed files back to PENDING",
+      "width": 138
+    },
+    {
+      "id": "park",
+      "lane": "batch",
+      "col": 3,
+      "type": "backend",
+      "label": "park()",
+      "sublabel": "consecutiveParks++",
+      "width": 132
+    },
+    {
+      "id": "trust",
+      "lane": "decide",
+      "col": 4,
+      "type": "backend",
+      "label": "wait = retryAfter",
+      "sublabel": "capped at maxPark (60s)",
+      "width": 138,
+      "yOffset": -40
+    },
+    {
+      "id": "distrust",
+      "lane": "decide",
+      "col": 4,
+      "type": "security",
+      "label": "wait = maxPark",
+      "sublabel": "ignore retryAfter entirely",
+      "width": 138,
+      "yOffset": 40
+    },
+    {
+      "id": "sleep",
+      "lane": "batch",
+      "col": 5,
+      "type": "backend",
+      "label": "sleep(wait)",
+      "sublabel": "then retries the batch",
+      "width": 132
+    }
+  ],
+  "edges": [
+    {
+      "id": "process-caught",
+      "from": "process",
+      "to": "caught",
+      "label": "429 from vendor or gate",
+      "variant": "security"
+    },
+    {
+      "id": "caught-release",
+      "from": "caught",
+      "to": "release",
+      "variant": "default"
+    },
+    {
+      "id": "release-park",
+      "from": "release",
+      "to": "park",
+      "variant": "default"
+    },
+    {
+      "id": "park-trust",
+      "from": "park",
+      "to": "trust",
+      "label": "\u2264 2 parks in a row, retryAfter present",
+      "variant": "emphasis"
+    },
+    {
+      "id": "park-distrust",
+      "from": "park",
+      "to": "distrust",
+      "label": "> 2 parks in a row, or no retryAfter",
+      "variant": "dashed",
+      "role": "branch"
+    },
+    {
+      "id": "trust-sleep",
+      "from": "trust",
+      "to": "sleep",
+      "variant": "default"
+    },
+    {
+      "id": "distrust-sleep",
+      "from": "distrust",
+      "to": "sleep",
+      "variant": "default"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Why release before sleeping",
+      "items": [
+        "A held lease sends no heartbeat while the thread sleeps",
+        "Releasing first means a long park can't make this worker look dead and lose leases it wasn't even parking on"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Why stop trusting retryAfter after 2 tries",
+      "items": [
+        "A short retryAfter that still ends in a 429 means the vendor's number doesn't match reality",
+        "consecutiveParks resets to 0 on the next successful batch \u2014 this only kicks in while the window is genuinely still saturated"
+      ]
+    }
+  ]
+}
