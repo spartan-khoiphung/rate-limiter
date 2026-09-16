@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Two Defenses, Mismatched Coverage",
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "viewBox": [960, 560]
+  },
+  "components": [
+    { "id": "attacker", "type": "external", "label": "Caller", "sublabel": "human, script, or bot", "pos": [40, 260], "size": [130, 60] },
+    { "id": "login", "type": "backend", "label": "Login", "sublabel": "brute-force target", "pos": [260, 60], "size": [150, 56] },
+    { "id": "otp", "type": "backend", "label": "OTP Verify", "sublabel": "brute-force target", "pos": [260, 136], "size": [150, 56] },
+    { "id": "partner", "type": "backend", "label": "Partner API", "sublabel": "trusted integration", "pos": [260, 212], "size": [150, 56] },
+    { "id": "intake", "type": "backend", "label": "Application Intake", "sublabel": "public apply form", "pos": [260, 360], "size": [150, 56] },
+    { "id": "ratelimit", "type": "security", "label": "Rate Limiting", "sublabel": "fixed window · token bucket", "pos": [570, 136], "size": [170, 60] },
+    { "id": "recaptcha", "type": "security", "label": "reCAPTCHA v3", "sublabel": "token checked, score unused", "pos": [570, 360], "size": [170, 60] }
+  ],
+  "boundaries": [
+    { "kind": "security-group", "label": "Behind rate limiting", "wraps": ["login", "otp", "partner", "intake", "ratelimit"] }
+  ],
+  "connections": [
+    { "id": "attacker-login", "from": "attacker", "to": "login", "variant": "dashed" },
+    { "id": "attacker-otp", "from": "attacker", "to": "otp", "variant": "dashed" },
+    { "id": "attacker-partner", "from": "attacker", "to": "partner", "variant": "dashed" },
+    { "id": "attacker-intake", "from": "attacker", "to": "intake", "variant": "dashed" },
+    { "id": "login-rl", "from": "login", "to": "ratelimit" },
+    { "id": "otp-rl", "from": "otp", "to": "ratelimit" },
+    { "id": "partner-rl", "from": "partner", "to": "ratelimit", "variant": "security" },
+    { "id": "intake-rl", "from": "intake", "to": "ratelimit", "fromSide": "top", "toSide": "bottom" },
+    { "id": "intake-recaptcha", "from": "intake", "to": "recaptcha", "variant": "emphasis" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "What's covered", "items": ["Every endpoint sits behind rate limiting — login, OTP, the partner API, and intake all have a counter"] },
+    { "dot": "rose", "title": "Where the gap is", "items": ["Login and OTP have no CAPTCHA at all — exactly where credential-stuffing and code-guessing happen", "reCAPTCHA v3's token is verified on intake, but its score is never read — bot scoring exists but isn't used", "Partner API is keyed on IP via the wrong end of X-Forwarded-For — spoofable"] }
+  ]
+}
