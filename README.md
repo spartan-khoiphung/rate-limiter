@@ -14,6 +14,16 @@ from GitHub Pages. Two pages sit alongside it:
 
 Just open `index.html` in a browser. No build step, no dependencies to install.
 
+The deck opens in **Simple** mode by default: the cover and sections 1–4 (29 slides).
+Use **Settings** in the bottom-left corner to switch to **Full** mode (all 46 slides),
+including sections 5–6, checkpoint questions, case studies, and takeaways. All content
+remains in `index.html`; switching versions also updates navigation, slide numbers,
+the overview, and printing.
+
+Your choice is remembered in this browser. To share a specific version, use
+`index.html?version=simple` or `index.html?version=full`. Slide links such as `#6.2`
+refer to positions within the selected version.
+
 ## Deploy to GitHub Pages
 
 Deployment is automatic: [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) builds and
