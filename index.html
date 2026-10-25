@@ -345,26 +345,6 @@ body.overview .slide > *:not(.notes):not(.foot) { opacity: 1; transform: none; t
 .progress { position: fixed; left: 0; right: 0; bottom: 0; height: 3px; background: var(--hairline-soft); }
 .progress i { display: block; height: 100%; width: 0; background: var(--accent); transition: width 0.3s ease; }
 .pager { position: fixed; right: 20px; bottom: 12px; font-family: var(--mono); font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.slide[hidden] { display: none !important; }
-.deck-settings {
-  position: fixed; left: 20px; bottom: 12px; z-index: 5;
-  font-size: 14px; color: var(--body);
-}
-.deck-settings summary {
-  cursor: pointer; padding: 8px 12px; border: 1px solid var(--hairline);
-  border-radius: var(--r-sm); background: var(--surface); font-weight: 500;
-}
-.deck-settings summary span { color: var(--muted); font-weight: 400; }
-.deck-settings fieldset {
-  position: absolute; bottom: 100%; left: 0; width: min(290px, calc(100vw - 72px));
-  margin: 0 0 8px; padding: 16px; border: 1px solid var(--hairline);
-  border-radius: var(--r-md); background: var(--surface); box-shadow: var(--shadow);
-}
-.deck-settings legend { padding: 0 4px; font-weight: 600; color: var(--ink); }
-.deck-settings label { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; cursor: pointer; }
-.deck-settings input { margin-top: 3px; accent-color: var(--accent-strong); }
-.deck-settings small { display: block; margin-top: 4px; line-height: 1.5; color: var(--muted); }
-.deck-settings :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .notes-panel {
   position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%);
   width: min(760px, calc(100vw - 48px)); max-height: 40vh; overflow: auto; box-sizing: border-box;
@@ -404,7 +384,7 @@ body.overview .progress, body.overview .pager { display: none; }
   }
   [data-step] { opacity: 1; transform: none; }
   .slide > *:not(.notes):not(.foot) { opacity: 1; transform: none; transition: none; }
-  .progress, .pager, .notes-panel, .deck-settings { display: none; }
+  .progress, .pager, .notes-panel { display: none; }
 }
 </style>
 </head>
@@ -1049,7 +1029,7 @@ else:
     </section>
 
     <!-- ============ SECTION 5 — SYSTEM DESIGN ============ -->
-    <section class="slide divider" data-version="full" data-section="divider-05">
+    <section class="slide divider" data-section="divider-05">
       <div class="divider-num">05</div>
       <div class="section-tag"><i></i>SECTION 5</div>
       <h2>System design</h2>
@@ -1058,7 +1038,7 @@ else:
       <div class="foot"><span>30 / 46</span><span>act v · system design</span></div>
     </section>
 
-    <section class="slide" data-version="full" data-section="requirements">
+    <section class="slide" data-section="requirements">
       <div class="eyebrow"><svg class="ic"><use href="#ic-gauge"/></svg>5.1 · Requirements</div>
       <h2>A worked example</h2>
       <div class="trio">
@@ -1083,7 +1063,7 @@ else:
       <div class="foot"><span>31 / 46</span><span>system design · requirements</span></div>
     </section>
 
-    <section class="slide" data-version="full" data-section="architecture">
+    <section class="slide" data-section="architecture">
       <div class="eyebrow"><svg class="ic"><use href="#ic-server"/></svg>5.2 · Architecture</div>
       <h2>Where the rate-limit service sits</h2>
       <div class="body meter" style="justify-content:center;">
@@ -1108,7 +1088,7 @@ else:
       <div class="foot"><span>32 / 46</span><span>system design · architecture</span></div>
     </section>
 
-    <section class="slide" data-version="full" data-section="sharding">
+    <section class="slide" data-section="sharding">
       <div class="eyebrow"><svg class="ic"><use href="#ic-server"/></svg>5.3 · Redis Cluster sharding</div>
       <h2>Per-user keys hash naturally; global keys don't</h2>
       <div class="split code-left">
@@ -1128,7 +1108,7 @@ else:
       <div class="foot"><span>33 / 46</span><span>sharding · per-user vs. global</span></div>
     </section>
 
-    <section class="slide" data-version="full" data-section="hard-soft">
+    <section class="slide" data-section="hard-soft">
       <div class="eyebrow"><svg class="ic"><use href="#ic-scale"/></svg>5.4 · Hard limit vs. soft limit</div>
       <h2>Same check, a different response to the result</h2>
       <div class="two">
@@ -1155,7 +1135,7 @@ when {
       <div class="foot"><span>34 / 46</span><span>hard limit vs. soft limit</span></div>
     </section>
 
-    <section class="slide" data-version="full" data-section="fail-open-closed">
+    <section class="slide" data-section="fail-open-closed">
       <div class="eyebrow"><svg class="ic"><use href="#ic-shield"/></svg>5.5 · When Redis itself is down</div>
       <h2>Fail-open vs. fail-closed</h2>
       <div class="two">
@@ -1176,7 +1156,7 @@ when {
       <div class="foot"><span>35 / 46</span><span>fail-open vs. fail-closed</span></div>
     </section>
 
-    <section class="slide" data-version="full" data-section="outbound-429">
+    <section class="slide" data-section="outbound-429">
       <div class="eyebrow"><svg class="ic"><use href="#ic-valve"/></svg>5.6 · Being a good client</div>
       <h2>Pace before the limit, absorb the 429 after</h2>
       <div class="two">
@@ -1200,7 +1180,7 @@ when {
       <div class="foot"><span>36 / 46</span><span>client-side backpressure</span></div>
     </section>
 
-    <section class="slide" data-version="full" data-section="backoff-table">
+    <section class="slide" data-section="backoff-table">
       <div class="eyebrow"><svg class="ic"><use href="#ic-clock"/></svg>Backoff schedules</div>
       <h2>Three schedules, one of them has jitter</h2>
       <div class="body meter" style="justify-content:center;">
@@ -1218,7 +1198,7 @@ when {
     </section>
 
     <!-- ============ SECTION 6 — DEMO ============ -->
-    <section class="slide divider" data-version="full" data-section="divider-06">
+    <section class="slide divider" data-section="divider-06">
       <div class="divider-num">06</div>
       <div class="section-tag"><i></i>SECTION 6</div>
       <h2>Demo</h2>
@@ -1227,7 +1207,7 @@ when {
       <div class="foot"><span>38 / 46</span><span>act vi · demo</span></div>
     </section>
 
-    <section class="slide" data-version="full" data-section="try-it">
+    <section class="slide" data-section="try-it">
       <div class="eyebrow"><svg class="ic"><use href="#ic-gate"/></svg>Hands on</div>
       <h2>Open it in four tabs and get throttled</h2>
       <div class="split even">
@@ -1256,7 +1236,7 @@ when {
     </section>
 
     <!-- ============ SECTION 7 — CHECKPOINT QUESTIONS ============ -->
-    <section class="slide divider" data-version="full" data-section="divider-07">
+    <section class="slide divider" data-section="divider-07">
       <div class="divider-num">07</div>
       <div class="section-tag"><i></i>SECTION 7</div>
       <h2>Checkpoint questions</h2>
@@ -1265,7 +1245,7 @@ when {
       <div class="foot"><span>40 / 46</span><span>act vii · checkpoint questions</span></div>
     </section>
 
-    <section class="slide" data-version="full" data-section="checkpoint">
+    <section class="slide" data-section="checkpoint">
       <div class="eyebrow"><svg class="ic"><use href="#ic-question"/></svg>Checkpoint questions</div>
       <h2>Easy, medium, hard</h2>
       <ul class="points">
@@ -1278,7 +1258,7 @@ when {
     </section>
 
     <!-- case study — real-world audit -->
-    <section class="slide" data-version="full" data-section="case-study">
+    <section class="slide" data-section="case-study">
       <div class="eyebrow"><svg class="ic"><use href="#ic-search"/></svg>A real audit, not a hypothetical</div>
       <h2>Rate limiting alone doesn't stop a bot</h2>
       <div class="body" style="min-height:0;">
@@ -1294,7 +1274,7 @@ when {
       <div class="foot"><span>42 / 46</span><span>case study · defense coverage</span></div>
     </section>
 
-    <section class="slide" data-version="full" data-section="case-study-pacer">
+    <section class="slide" data-section="case-study-pacer">
       <div class="eyebrow"><svg class="ic"><use href="#ic-bucket"/></svg>Use case · outbound token bucket</div>
       <h2>Proactive pacing, reactive gate — same vendor call</h2>
       <div class="body" style="min-height:0;">
@@ -1310,7 +1290,7 @@ when {
       <div class="foot"><span>43 / 46</span><span>case study · token bucket in production</span></div>
     </section>
 
-    <section class="slide" data-version="full" data-section="case-study-park">
+    <section class="slide" data-section="case-study-park">
       <div class="eyebrow"><svg class="ic"><use href="#ic-server"/></svg>Use case · the worker's response</div>
       <h2>What "park" actually means</h2>
       <div class="body" style="min-height:0;">
@@ -1327,7 +1307,7 @@ when {
     </section>
 
     <!-- ============ TAKEAWAYS ============ -->
-    <section class="slide divider" data-version="full" data-section="divider-08">
+    <section class="slide divider" data-section="divider-08">
       <div class="divider-num">08</div>
       <div class="section-tag"><i></i>SECTION 8</div>
       <h2>Takeaways</h2>
@@ -1336,7 +1316,7 @@ when {
       <div class="foot"><span>45 / 46</span><span>act viii · summary</span></div>
     </section>
 
-    <section class="slide" data-version="full" data-section="takeaways">
+    <section class="slide" data-section="takeaways">
       <div class="eyebrow"><svg class="ic"><use href="#ic-list"/></svg>Takeaways</div>
       <h2>Five things worth remembering</h2>
       <ul class="points">
@@ -1357,14 +1337,6 @@ when {
 <div class="progress"><i></i></div>
 <div class="pager"></div>
 <div class="notes-panel" hidden></div>
-<details class="deck-settings">
-  <summary>Settings <span id="version-label">· Simple</span></summary>
-  <fieldset>
-    <legend>Deck version</legend>
-    <label><input type="radio" name="deck-version" value="simple" checked /><span>Simple<small>Cover and sections 1–4 only.</small></span></label>
-    <label><input type="radio" name="deck-version" value="full" /><span>Full<small>All sections, including system design, demo, checkpoint questions and case studies.</small></span></label>
-  </fieldset>
-</details>
 
 <script>
 // Charts and interactive widgets. Every chart draws marks, ticks and labels from one linear scale.
@@ -1619,51 +1591,15 @@ when {
 // Keyboard-driven deck: data-step reveals, #slide.step deep links, N notes, O overview, T theme, F fullscreen.
 (() => {
   const deck = document.getElementById('deck');
-  const allSlides = [...deck.querySelectorAll('.slide')];
-  let slides = [];
+  const slides = [...deck.querySelectorAll('.slide')];
   const bar = document.querySelector('.progress i');
   const pager = document.querySelector('.pager');
   const notesPanel = document.querySelector('.notes-panel');
-  const settings = document.querySelector('.deck-settings');
-  const versionLabel = document.getElementById('version-label');
-  const versionInputs = [...settings.querySelectorAll('input[name="deck-version"]')];
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const fmt = (n) => n.toLocaleString('en-US');
 
   let current = 0;
   let step = 0;
-
-  function storedVersion() {
-    const requested = new URLSearchParams(location.search).get('version');
-    if (requested === 'simple' || requested === 'full') return requested;
-    try { return localStorage.getItem('rl-version') === 'full' ? 'full' : 'simple'; }
-    catch { return 'simple'; }
-  }
-
-  function applyVersion(version, persist = false) {
-    const activeSlide = slides[current];
-    const activeStep = step;
-    allSlides.forEach((slide) => {
-      slide.hidden = version === 'simple' && slide.dataset.version === 'full';
-      slide.classList.remove('active');
-    });
-    slides = allSlides.filter((slide) => !slide.hidden);
-    slides.forEach((slide, i) => {
-      slide.querySelector('.foot > span').textContent = `${i + 1} / ${slides.length}`;
-    });
-    versionInputs.forEach((input) => { input.checked = input.value === version; });
-    versionLabel.textContent = `· ${version === 'full' ? 'Full' : 'Simple'}`;
-    document.documentElement.dataset.version = version;
-    if (persist) {
-      try { localStorage.setItem('rl-version', version); } catch { /* storage can be unavailable */ }
-      const url = new URL(location.href);
-      url.searchParams.set('version', version);
-      history.replaceState(null, '', url);
-    }
-    const index = slides.indexOf(activeSlide);
-    go(index >= 0 ? index : Math.min(current, slides.length - 1), index >= 0 ? activeStep : 0);
-    if (document.body.classList.contains('overview')) slides[current].scrollIntoView({ block: 'center' });
-  }
 
   const maxStep = (slide) =>
     Math.max(0, ...[...slide.querySelectorAll('[data-step]')].map((n) => Number(n.dataset.step)));
@@ -1733,10 +1669,8 @@ when {
   };
 
   function applyStoredTheme() {
-    try {
-      const saved = localStorage.getItem('rl-theme');
-      if (saved) document.documentElement.dataset.theme = saved;
-    } catch { /* storage can be unavailable */ }
+    const saved = localStorage.getItem('rl-theme');
+    if (saved) document.documentElement.dataset.theme = saved;
   }
   function toggleTheme() {
     const isDark = matchMedia('(prefers-color-scheme: dark)').matches;
@@ -1747,12 +1681,7 @@ when {
   }
 
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && settings.open) {
-      settings.open = false;
-      settings.querySelector('summary').focus();
-      return;
-    }
-    if (e.metaKey || e.ctrlKey || e.altKey || e.target.closest('input, select, textarea, button, a, details, [contenteditable="true"]')) return;
+    if (e.metaKey || e.ctrlKey || e.altKey || e.target.matches('input')) return;
     const overview = document.body.classList.contains('overview');
     switch (e.key) {
       case 'ArrowRight': case 'PageDown': case ' ': case 'Enter':
@@ -1784,12 +1713,9 @@ when {
 
   addEventListener('resize', fit);
   addEventListener('hashchange', fromHash);
-  versionInputs.forEach((input) => input.addEventListener('change', () => applyVersion(input.value, true)));
   applyStoredTheme();
   fit();
-  const initialHash = location.hash;
-  applyVersion(storedVersion());
-  history.replaceState(null, '', `${location.pathname}${location.search}${initialHash}`);
+  render(true);
   fromHash();
 })();
 </script>
